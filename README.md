@@ -1,212 +1,147 @@
 # ATLAS
 
-On-premises, modular RAG assistant for company procedures, departments, and policy — grounded on internal email.
+On-premises assistant for company procedures, departments, and policy. Answers are grounded in internal email (RAG over Qdrant).
 
-Designed for **home development now** and **work deployment later** without rewriting application code. Swap backends via environment variables only.
+**Ollama** runs the chat model. **The default model is Microsoft Phi-3 Mini** (`phi3:latest`) — a small 3.8B model meant for laptops. It is not Google, and it is not a custom ATLAS build. Google’s small model is Gemma (`gemma2:2b`).
 
-## Quick install (home)
+## Install on a new Windows PC (no Docker)
 
-**Requirements:** Docker Desktop, [Ollama](https://ollama.com)
+You need:
+
+1. **Python 3.10+** — [python.org](https://www.python.org/downloads/) (tick “Add Python to PATH”)
+2. **Ollama** — [ollama.com](https://ollama.com) (install, then leave it running in the tray)
+3. **Git** — [git-scm.com](https://git-scm.com)
 
 ```powershell
-git clone https://github.com/YOUR_ORG/ATLAS.git
+git clone https://github.com/ExoFi-Labs/ATLAS.git
 cd ATLAS
 .\scripts\install.ps1
-ollama pull llama3.1:8b
 ```
 
-Open http://localhost:8080
+That copies `.env`, installs Python packages, and pulls **Phi-3 Mini** if it is missing.
 
-Index the sample policy emails (first run downloads the embedding model):
+Then, in the same folder:
 
 ```powershell
-docker compose exec atlas atlas ingest examples/emails
+python -m atlas.cli ingest examples/emails
+python -m atlas.cli serve
 ```
 
-Then ask: *How much PTO do employees accrue?* or *Who owns expense reports?*
+Open **http://localhost:8080**
 
-Linux/macOS:
+First ingest downloads the embedding model (`bge-small-en-v1.5`, CPU). After that, ask: *How much PTO do employees accrue?*
+
+### Linux / macOS
 
 ```bash
-git clone https://github.com/YOUR_ORG/ATLAS.git
+git clone https://github.com/ExoFi-Labs/ATLAS.git
 cd ATLAS
+chmod +x scripts/install.sh
 ./scripts/install.sh
-ollama pull llama3.1:8b
-docker compose exec atlas atlas ingest examples/emails
+python -m atlas.cli ingest examples/emails
+python -m atlas.cli serve
 ```
 
-## Email ingestion
+Docker is **optional** (Qdrant server + vLLM later). This PC uses embedded Qdrant in `data/qdrant/` so Docker is not required.
 
-Drop `.eml` or `.mbox` files into a folder and index them. The pipeline is modular: parse → reconstruct threads → strip quotes/signatures → scrub PII → message-level chunks → embed → Qdrant.
+## Pages in the UI
+
+| Page | What it is |
+|------|------------|
+| **Chat** | Ask questions. ATLAS searches Qdrant, then answers with the Ollama model. |
+| **Qdrant** | Vector database. Upload `.eml` / `.mbox`, browse, open, delete. |
+| **Ollama** | Models on this PC. Pull Phi / Llama / Gemma, inspect Modelfiles, switch the chat model. |
+| **About** | Live specs and email capacity. |
+| **Settings** | Dropdown of installed models, RAG limits, voice. Saves to `.env`. |
+
+## Which model should I run?
+
+| Hardware | Use | Ollama name |
+|----------|-----|-------------|
+| Work laptop (i7, 8–16 GB RAM, little or no GPU) | **Phi-3 Mini (default)** or Phi-4 Mini | `phi3:latest` / `phi4-mini` |
+| Same laptop, want even smaller | Gemma 2 2B (Google) or Llama 3.2 3B | `gemma2:2b` / `llama3.2:3b` |
+| Desktop GPU (e.g. 1080 Ti 11 GB) | Llama 3.1 8B for better quality | `llama3.1:8b` |
+| Work cluster | vLLM, not Ollama | set `ATLAS_LLM__BASE_URL` |
+
+Phi-3 Mini is about **2.2 GB on disk** and runs on CPU. Expect slower replies on i7-only than on a GPU, but it is usable. 7B–8B models on CPU-only will feel heavy.
+
+Ollama can **list, pull, show, and delete** models on this machine (`/api/tags`, `/api/pull`, …). It does **not** offer an official API to browse [ollama.com/library](https://ollama.com/library). The Ollama page ships a shortlist and lets you pull any library name.
+
+## Add your own email
+
+In the UI: **Qdrant → drop `.eml` or `.mbox` files**.
+
+Or CLI (stop `atlas serve` first if you use embedded Qdrant — only one process can open `data/qdrant`):
 
 ```powershell
-# Inside the API container (uses ATLAS_VECTOR__URL=http://qdrant:6333)
-docker compose exec atlas atlas ingest examples/emails
-
-# Preview only — no embeddings or Qdrant writes
-docker compose exec atlas atlas ingest examples/emails --dry-run
-
-# Tag a department and restrict retrieval roles
-docker compose exec atlas atlas ingest examples/emails --department hr --roles all-staff,hr
+python -m atlas.cli ingest examples/emails
+python -m atlas.cli ingest C:\path\to\export --department hr --roles all-staff,hr
+python -m atlas.cli ingest C:\path\to\export --dry-run
 ```
-
-From the host (point Qdrant at the published port):
-
-```powershell
-$env:ATLAS_VECTOR__URL="http://localhost:6333"
-atlas ingest examples/emails
-```
-
-Chunks are idempotent (stable IDs from `Message-ID`). Re-running ingest updates the same points.
 
 | Stage | What it does |
 |-------|----------------|
-| Parse | MIME / HTML / mbox, headers, `In-Reply-To` / `References` |
-| Clean | Quoted-reply stripping, signature/footer removal |
-| PII | Regex scrubber (`RegexPIIScrubber`) — swap for Presidio later |
-| Chunk | One chunk per message (split long bodies on paragraphs) |
-| Index | Embed with `bge-small` and upsert to Qdrant with `allowed_roles` |
+| Parse | MIME / HTML / mbox, thread headers |
+| Clean | Quoted replies, signatures |
+| PII | Regex scrub (`[EMAIL]`, `[PHONE]`, …) |
+| Attachments | PDF, Word, Excel, CSV, text extracted into extra chunks |
+| Chunk | One vector per message, plus one per attachment |
+| Index | Embed with `bge-small` into Qdrant |
 
-## Modular architecture
+Scanned/image PDFs have no text layer — those are skipped until OCR is added. Images (png/jpg) are listed but not read yet.
 
-Every external system sits behind a **provider interface**. The API, RAG pipeline, and UI never import Ollama, vLLM, or Google directly — they use `ProviderRegistry`.
+## Architecture
 
-```
-┌─────────────┐     ┌──────────────────┐     ┌─────────────────────────┐
-│  web/ UI    │────▶│  atlas/api       │────▶│  atlas/rag/pipeline     │
-└─────────────┘     └────────┬─────────┘     └───────────┬─────────────┘
-                             │                             │
-                    ┌────────▼─────────┐          ┌────────▼─────────┐
-                    │ ProviderRegistry │          │ Vector + Embed   │
-                    └────────┬─────────┘          └──────────────────┘
-         ┌───────────────────┼───────────────────┐
-         ▼                   ▼                   ▼
-    LLM (Ollama/vLLM)   Auth (dev/OIDC)    TTS (Google/none)
-```
+Swap backends with `.env`. Chat, RAG, and the UI never import Ollama or vLLM directly.
 
-| Component | Interface | Home default | Work swap |
-|-----------|-----------|--------------|-----------|
-| LLM | `LLMProvider` | Ollama (`ATLAS_LLM__BASE_URL`) | vLLM — change URL only |
-| Auth | `AuthProvider` | `dev` | `oidc` (Azure AD / Okta) |
-| Vector DB | `VectorStoreProvider` | Qdrant | same |
-| Embeddings | `EmbeddingsProvider` | sentence-transformers (CPU) | optional CUDA |
-| TTS | `TTSProvider` | Google Cloud TTS | same |
-| STT | `STTProvider` | faster-whisper | same |
-
-### Swap example: Ollama → vLLM
-
-Only `.env` changes — no code changes:
+| Piece | Home | Work later |
+|-------|------|------------|
+| Chat LLM | Ollama + **Phi-3 Mini** | vLLM + larger instruct model |
+| Vectors | Qdrant embedded (`data/qdrant`) | Qdrant server |
+| Auth | `dev` user | OIDC (Azure AD / Okta) |
+| TTS | off, or Google Cloud TTS | same |
 
 ```env
-ATLAS_LLM__PROVIDER=vllm
-ATLAS_LLM__BASE_URL=http://vllm:8000/v1
-ATLAS_LLM__MODEL=meta-llama/Meta-Llama-3.1-8B-Instruct-AWQ
+ATLAS_LLM__PROVIDER=ollama
+ATLAS_LLM__BASE_URL=http://127.0.0.1:11434/v1
+ATLAS_LLM__MODEL=phi3:latest
+ATLAS_VECTOR__PATH=./data/qdrant
 ```
 
-Then enable the vLLM service:
-
-```bash
-docker compose --profile vllm up -d
-```
-
-See `deploy/profiles/home.env.example` and `deploy/profiles/work.env.example`.
-
-### Swap example: dev auth → SSO
-
-```env
-ATLAS_AUTH__PROVIDER=oidc
-ATLAS_AUTH__OIDC_ISSUER=https://login.microsoftonline.com/{tenant}/v2.0
-ATLAS_AUTH__OIDC_CLIENT_ID=...
-ATLAS_AUTH__OIDC_CLIENT_SECRET=...
-```
-
-Implement token validation in `src/atlas/providers/auth/oidc.py` — the rest of ATLAS already filters retrieval by `UserContext.roles`.
-
-## Work migration checklist
-
-1. Clone repo on server: `git clone ... && cp deploy/profiles/work.env.example .env`
-2. Fill in OIDC secrets and Google TTS credentials
-3. `docker compose up -d` (+ `--profile vllm` if using bundled vLLM)
-4. Point LLM at your inference cluster (`ATLAS_LLM__BASE_URL`)
-5. Run `atlas ingest /path/to/mail-export` against the production mailbox dump
-6. Verify RBAC filters with real SSO group → role mappings
-
-**You do not start over.** Same repo, same UI, same RAG code — different `.env`.
+Work vLLM example: `deploy/profiles/work.env.example`.
 
 ## Configuration
 
-Copy `.env.example` to `.env`. All settings use the `ATLAS_` prefix with nested `__` segments:
+Copy `.env.example` to `.env` (the install script does this).
 
 | Variable | Purpose |
 |----------|---------|
-| `ATLAS_LLM__BASE_URL` | OpenAI-compatible LLM endpoint |
-| `ATLAS_LLM__MODEL` | Model name |
+| `ATLAS_LLM__MODEL` | Ollama model name (`phi3:latest`) |
+| `ATLAS_LLM__BASE_URL` | `http://127.0.0.1:11434/v1` |
+| `ATLAS_VECTOR__PATH` | Embedded Qdrant folder. Empty = use `ATLAS_VECTOR__URL` |
 | `ATLAS_AUTH__PROVIDER` | `dev` or `oidc` |
-| `ATLAS_AUTH__DEV_ROLES` | Comma-separated roles for local RBAC testing |
-| `ATLAS_VECTOR__URL` | Qdrant URL |
-| `ATLAS_INGESTION__DEFAULT_ROLES` | ACL roles written onto ingested chunks |
-| `ATLAS_TTS__PROVIDER` | `google` or `none` |
-| `GOOGLE_APPLICATION_CREDENTIALS` | GCP service account for TTS |
+| `ATLAS_TTS__PROVIDER` | `none` or `google` |
 
-## Local development (without Docker)
+Do not commit `.env`. Local index lives in `data/` and is gitignored.
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate   # Windows
-pip install -e ".[dev]"
-copy .env.example .env
-atlas serve
-```
-
-Ingest from the host after Qdrant is up:
-
-```powershell
-$env:ATLAS_VECTOR__URL="http://localhost:6333"
-atlas ingest examples/emails
-```
-
-Run Qdrant separately (`docker compose up qdrant postgres -d`) or adjust URLs to localhost.
-
-## API
+## API (selected)
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/health` | Status + active providers |
-| `POST /api/chat` | RAG chat (JSON) |
-| `POST /api/chat/stream` | SSE streaming |
-| `POST /api/voice/transcribe` | Upload audio → text |
-| `POST /api/voice/synthesize` | Text → MP3 (Google TTS) |
-
-## Project layout
-
-```
-ATLAS/
-├── src/atlas/
-│   ├── api/              # FastAPI gateway
-│   ├── config.py         # All env-driven settings
-│   ├── providers/        # Swappable backends
-│   │   ├── registry.py   # Factory — single swap point
-│   │   ├── llm/          # OpenAI-compatible (Ollama + vLLM)
-│   │   ├── auth/         # dev + OIDC stub
-│   │   ├── vector/       # Qdrant
-│   │   ├── tts/          # Google
-│   │   └── stt/          # Whisper
-│   ├── rag/              # Retrieval + prompt assembly
-│   └── ingestion/        # Email parse, PII, chunk, index
-├── examples/emails/      # Sample policy threads for local RAG
-├── web/                  # Minimal chat UI
-├── deploy/profiles/      # home vs work env templates
-├── docker-compose.yml
-└── scripts/install.ps1   # One-command setup
-```
+| `GET /api/health` | Process is up |
+| `POST /api/chat` | RAG chat |
+| `GET /api/sources` | Qdrant email list |
+| `GET /api/ollama/status` | Local Ollama models |
+| `GET /api/ollama/catalog` | Laptop shortlist |
+| `POST /api/ollama/pull` | Download a library model (stream) |
 
 ## Roadmap
 
-- [x] Email ingestion pipeline (thread parse, PII scrub, chunk, index)
-- [ ] OIDC implementation (Azure AD / Okta)
-- [ ] Silero VAD in browser + voice mode UI
+- [x] Email ingestion, Qdrant console, Ollama model manager
+- [ ] OIDC (Azure AD / Okta)
+- [ ] Silero VAD + voice UI
 - [ ] Hybrid BM25 + reranker
 
 ## License
 
-Internal use — adjust as needed.
+Internal use.

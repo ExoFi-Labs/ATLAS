@@ -2,35 +2,43 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
-Write-Host "==> ATLAS install"
+Write-Host "==> ATLAS install (Windows, no Docker required)"
 
-if (-not (Test-Path ".env")) {
-  Copy-Item ".env.example" ".env"
-  Write-Host "Created .env from .env.example"
-}
-
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-  Write-Host "Docker is required. Install Docker Desktop and re-run scripts/install.ps1"
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+  Write-Host "Python 3.10+ is required. Install from https://www.python.org/downloads/ (Add to PATH)."
   exit 1
 }
 
-Write-Host "==> Starting infrastructure (Qdrant, Postgres, ATLAS API)"
-docker compose up -d --build
+if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+  Write-Host "Ollama is required. Install from https://ollama.com then re-run this script."
+  exit 1
+}
+
+if (-not (Test-Path ".env")) {
+  Copy-Item ".env.example" ".env"
+  Write-Host "Created .env from .env.example (chat model: Microsoft Phi-3 Mini / phi3:latest)"
+}
+
+Write-Host "==> Installing Python package"
+python -m pip install -e .
+
+Write-Host "==> Ensuring Phi-3 Mini is available (small laptop model, ~2.2 GB)"
+ollama pull phi3:latest
 
 Write-Host @"
 
-ATLAS is starting.
+ATLAS is installed.
 
-Next steps:
-1. Install Ollama:  https://ollama.com
-2. Pull a model:    ollama pull llama3.1:8b
-5. Index sample emails:
-   docker compose exec atlas atlas ingest examples/emails
-6. Open the UI and ask: "How much PTO do employees accrue?"
+Next:
+  python -m atlas.cli ingest examples/emails
+  python -m atlas.cli serve
 
-Work migration:
-- Copy deploy/profiles/work.env.example values into .env
-- Enable vLLM:      docker compose --profile vllm up -d
-- Switch auth:      ATLAS_AUTH__PROVIDER=oidc
+Then open http://localhost:8080
+  Chat    — ask policy questions
+  Qdrant  — upload / browse email vectors
+  Ollama  — list, pull, and switch models (Phi, Llama, Gemma, …)
+
+Default chat model: Microsoft Phi-3 Mini (phi3:latest) via Ollama.
+That is not Google. Gemma is Google's small model if you want it.
 
 "@

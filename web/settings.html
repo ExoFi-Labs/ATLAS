@@ -11,19 +11,26 @@
       <div id="nav"></div>
       <div id="hero"></div>
       <p class="lede">
-        Runtime controls written into <code>.env</code>. RAG limits apply on the next question.
-        Changing the LLM URL, TTS, or STT provider needs an ATLAS restart so those clients reload.
+        Runtime controls written into <code>.env</code>. Pick a chat model from Ollama
+        (installed on this PC). RAG limits apply on the next question.
+        Changing the LLM URL, TTS, or STT provider needs an ATLAS restart.
       </p>
 
       <form class="panel" id="form">
         <h2>Language model</h2>
         <div class="form-grid">
-          <div><label>Model</label><input name="ATLAS_LLM__MODEL" /></div>
+          <div>
+            <label>Installed Ollama models</label>
+            <select name="ATLAS_LLM__MODEL" id="model-select"></select>
+          </div>
           <div><label>Base URL</label><input name="ATLAS_LLM__BASE_URL" /></div>
           <div><label>Max tokens</label><input name="ATLAS_LLM__MAX_TOKENS" type="number" /></div>
           <div><label>Temperature</label><input name="ATLAS_LLM__TEMPERATURE" type="number" step="0.05" /></div>
         </div>
-        <p class="help">Home default is Ollama. At work, point Base URL at vLLM (<code>http://vllm:8000/v1</code>).</p>
+        <p class="help">
+          Default is Microsoft <strong>Phi-3 Mini</strong> (<code>phi3:latest</code>) via Ollama — a small model for laptops.
+          Browse, pull, or inspect models on the <a href="/ollama.html">Ollama</a> page.
+        </p>
 
         <h2 style="margin-top: 22px">Retrieval (RAG)</h2>
         <div class="form-grid">
@@ -72,13 +79,20 @@
       document.getElementById("nav").innerHTML = nav("settings");
       document.getElementById("hero").innerHTML = terminal("settings · persist to .env");
       const form = document.getElementById("form");
+      const modelSelect = document.getElementById("model-select");
 
-      api("/api/settings").then((data) => {
-        Object.entries(data.values || {}).forEach(([key, value]) => {
-          const field = form.elements[key];
-          if (field) field.value = value;
+      Promise.all([api("/api/settings"), api("/api/ollama/status").catch(() => ({ online: false, models: [] }))])
+        .then(([data, ollama]) => {
+          const current = data.values.ATLAS_LLM__MODEL;
+          const names = (ollama.models || []).map((m) => m.name);
+          if (current && !names.includes(current)) names.unshift(current);
+          if (!names.length) names.push(current || "phi3:latest");
+          modelSelect.innerHTML = names.map((name) => `<option value="${name}">${name}</option>`).join("");
+          Object.entries(data.values || {}).forEach(([key, value]) => {
+            const field = form.elements[key];
+            if (field) field.value = value;
+          });
         });
-      });
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();

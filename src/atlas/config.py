@@ -18,7 +18,7 @@ class AuthSettings(BaseModel):
 class LLMSettings(BaseModel):
     provider: Literal["ollama", "vllm", "openai_compat"] = "ollama"
     base_url: str = "http://localhost:11434/v1"
-    model: str = "llama3.1:8b"
+    model: str = "phi3:latest"
     api_key: str = "ollama"
     max_tokens: int = 1024
     temperature: float = 0.2

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ollama — ATLAS</title>
+    <link rel="stylesheet" href="/css/atlas.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div id="nav"></div>
+      <div id="hero"></div>
+      <p class="lede">
+        <strong>Ollama</strong> is the local model runner. The chat model is
+        <strong>Microsoft Phi-3 Mini</strong> (<code>phi3:latest</code>) by default — not Google.
+        Google’s small model is Gemma. This page lists models on this PC, pulls free models from
+        the Ollama library, and can switch what ATLAS uses.
+      </p>
+
+      <div class="cards" id="live"></div>
+
+      <div class="grid-2" style="margin-top: 16px">
+        <section class="panel">
+          <h2>Installed on this PC</h2>
+          <p class="help" id="local-help">Talks to Ollama at <code>/api/tags</code> (same as <code>ollama list</code>).</p>
+          <div style="overflow:auto">
+            <table class="table" id="local-table"></table>
+          </div>
+        </section>
+        <section class="panel">
+          <h2>Model details</h2>
+          <p class="help">Select a local model to inspect its Modelfile, parameters, and license.</p>
+          <pre class="raw" id="details">Pick a model from the table.</pre>
+        </section>
+      </div>
+
+      <section class="panel" style="margin-top: 16px">
+        <h2>Laptop shortlist</h2>
+        <p class="help">
+          Ollama does not publish an official “browse the library” API. ATLAS keeps a curated
+          list for an i7 work laptop. You can still pull any name from
+          <a href="https://ollama.com/library" target="_blank" rel="noreferrer">ollama.com/library</a>.
+        </p>
+        <div class="composer" style="margin-bottom: 12px">
+          <input id="search" placeholder="Filter shortlist, or type a library name to pull (e.g. phi4-mini)" />
+          <button type="button" id="search-btn">Search</button>
+        </div>
+        <p class="flash" id="pull-status"></p>
+        <div style="overflow:auto">
+          <table class="table" id="catalog-table"></table>
+        </div>
+      </section>
+    </div>
+    <script src="/js/atlas.js"></script>
+    <script>
+      document.getElementById("nav").innerHTML = nav("ollama");
+      document.getElementById("hero").innerHTML = terminal("ollama · local models · microsoft phi-3 default");
+
+      function gb(n) {
+        if (!n) return "—";
+        return `${(n / (1024 ** 3)).toFixed(1)} GB`;
+      }
+
+      async function useModel(name) {
+        await api("/api/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ values: { ATLAS_LLM__MODEL: name } }),
+        });
+        document.getElementById("pull-status").textContent = `ATLAS will now use ${name} on the next question.`;
+        await refreshLocal();
+      }
+
+      async function showModel(name) {
+        const data = await api("/api/ollama/show", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: name }),
+        });
+        const details = data.details || {};
+        document.getElementById("details").textContent =
+          `model: ${data.model}\n` +
+          `family: ${details.family || "—"}\n` +
+          `parameters: ${details.parameter_size || "—"}\n` +
+          `quantization: ${details.quantization_level || "—"}\n\n` +
+          `${data.parameters || ""}\n\n` +
+          (data.modelfile || "").slice(0, 1800);
+      }
+
+      async function deleteModel(name) {
+        if (!confirm(`Delete ${name} from this PC?`)) return;
+        await api("/api/ollama/model", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: name }),
+        });
+        await refreshLocal();
+      }
+
+      async function pullModel(name) {
+        const status = document.getElementById("pull-status");
+        status.textContent = `Pulling ${name}…`;
+        const response = await fetch("/api/ollama/pull", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: name }),
+        });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let leftover = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          leftover += decoder.decode(value, { stream: true });
+          const lines = leftover.split("\n");
+          leftover = lines.pop();
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const event = JSON.parse(line);
+              if (event.error) status.textContent = event.error;
+              else if (event.total) {
+                const pct = Math.round((100 * (event.completed || 0)) / event.total);
+                status.textContent = `${event.status || "downloading"} ${name} — ${pct}%`;
+              } else status.textContent = event.status || "working…";
+            } catch {
+              status.textContent = line;
+            }
+          }
+        }
+        status.textContent = `Finished ${name}.`;
+        await refreshLocal();
+      }
+
+      async function refreshLocal() {
+        const data = await api("/api/ollama/status");
+        const live = document.getElementById("live");
+        if (!data.online) {
+          live.innerHTML = `<div class="stat"><b>offline</b><span>Ollama</span></div>`;
+          document.getElementById("local-help").textContent = data.error || "Start Ollama, then refresh.";
+          return;
+        }
+        const running = (data.running || []).map((m) => m.name || m.model).join(", ") || "idle";
+        live.innerHTML = `
+          <div class="stat"><b>online</b><span>Ollama</span></div>
+          <div class="stat"><b>${data.active}</b><span>ATLAS chat model</span></div>
+          <div class="stat"><b>${(data.models || []).length}</b><span>Installed</span></div>
+          <div class="stat"><b>${running}</b><span>In memory</span></div>`;
+        const rows = (data.models || []).map((m) => {
+          const name = m.name;
+          const active = name === data.active ? " (active)" : "";
+          return `<tr>
+            <td><a href="#" data-show="${name}">${name}${active}</a></td>
+            <td>${m.details?.parameter_size || "—"}</td>
+            <td>${m.details?.quantization_level || "—"}</td>
+            <td>${gb(m.size)}</td>
+            <td>
+              <a href="#" data-use="${name}">Use</a>
+              · <a href="#" data-del="${name}">Delete</a>
+            </td>
+          </tr>`;
+        }).join("");
+        document.getElementById("local-table").innerHTML =
+          `<tr><th>Name</th><th>Size</th><th>Quant</th><th>Disk</th><th></th></tr>${rows || "<tr><td>No models installed</td></tr>"}`;
+      }
+
+      async function refreshCatalog(query = "") {
+        const data = await api(`/api/ollama/catalog?q=${encodeURIComponent(query)}`);
+        document.getElementById("catalog-table").innerHTML =
+          `<tr><th>Model</th><th>Maker</th><th>Fit</th><th>Why</th><th></th></tr>` +
+          data.models.map((item) => `<tr>
+            <td><strong>${item.title}</strong><br><span class="muted">${item.name} · ${item.disk}</span></td>
+            <td>${item.maker}<br><span class="muted">${item.params}</span></td>
+            <td>${item.fit}<br><span class="muted">${item.tier}</span></td>
+            <td>${item.why}</td>
+            <td><a href="#" data-pull="${item.name}">Pull</a></td>
+          </tr>`).join("");
+      }
+
+      document.getElementById("search-btn").onclick = () => refreshCatalog(document.getElementById("search").value);
+      document.getElementById("search").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          refreshCatalog(document.getElementById("search").value);
+        }
+      });
+      document.body.addEventListener("click", (event) => {
+        const link = event.target.closest("a[data-use], a[data-show], a[data-del], a[data-pull]");
+        if (!link) return;
+        event.preventDefault();
+        if (link.dataset.use) useModel(link.dataset.use);
+        if (link.dataset.show) showModel(link.dataset.show);
+        if (link.dataset.del) deleteModel(link.dataset.del);
+        if (link.dataset.pull) pullModel(link.dataset.pull);
+      });
+
+      refreshLocal().catch((error) => {
+        document.getElementById("local-help").textContent = error.message;
+      });
+      refreshCatalog();
+    </script>
+  </body>
+</html>

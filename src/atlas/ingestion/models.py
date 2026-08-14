@@ -5,6 +5,14 @@ from datetime import datetime
 
 
 @dataclass
+class ParsedAttachment:
+    filename: str
+    content_type: str
+    text: str = ""
+    skipped_reason: str = ""
+
+
+@dataclass
 class ParsedEmail:
     message_id: str
     in_reply_to: str | None
@@ -16,6 +24,7 @@ class ParsedEmail:
     subject: str
     body_raw: str
     source_path: str = ""
+    attachments: list[ParsedAttachment] = field(default_factory=list)
 
 
 @dataclass
@@ -33,6 +42,7 @@ class CleanedEmail:
     position_in_thread: int = 0
     source_path: str = ""
     pii_hits: dict[str, int] = field(default_factory=dict)
+    attachments: list[ParsedAttachment] = field(default_factory=list)
 
 
 @dataclass

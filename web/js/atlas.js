@@ -13,6 +13,7 @@ function nav(active) {
       <nav class="nav">
         <a href="/" class="${active === "chat" ? "active" : ""}">Chat</a>
         <a href="/qdrant.html" class="${active === "qdrant" ? "active" : ""}">Qdrant</a>
+        <a href="/ollama.html" class="${active === "ollama" ? "active" : ""}">Ollama</a>
         <a href="/about.html" class="${active === "about" ? "active" : ""}">About</a>
         <a href="/settings.html" class="${active === "settings" ? "active" : ""}">Settings</a>
       </nav>

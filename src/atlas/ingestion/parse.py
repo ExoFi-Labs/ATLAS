@@ -8,7 +8,8 @@ from email.utils import getaddresses, parsedate_to_datetime
 from html.parser import HTMLParser
 from pathlib import Path
 
-from atlas.ingestion.models import ParsedEmail
+from atlas.ingestion.attachments import extract_attachment
+from atlas.ingestion.models import ParsedAttachment, ParsedEmail
 
 
 class _HTMLToText(HTMLParser):
@@ -97,7 +98,7 @@ def _from_email_message(message, source_path: str) -> ParsedEmail:
     to = _format_addresses(message.get("To"))
     cc = _format_addresses(message.get("Cc"))
     date = _parse_date(message.get("Date"))
-    body = _extract_body(message)
+    body, attachments = _extract_body_and_attachments(message)
     return ParsedEmail(
         message_id=message_id,
         in_reply_to=in_reply_to,
@@ -109,6 +110,7 @@ def _from_email_message(message, source_path: str) -> ParsedEmail:
         subject=subject,
         body_raw=body,
         source_path=source_path,
+        attachments=attachments,
     )
 
 
@@ -127,32 +129,48 @@ def _parse_date(value) -> datetime | None:
         return None
 
 
-def _extract_body(message) -> str:
-    if message.is_multipart():
-        text_parts: list[str] = []
-        html_parts: list[str] = []
-        for part in message.walk():
-            content_type = part.get_content_type()
-            disposition = str(part.get("Content-Disposition") or "")
-            if "attachment" in disposition.lower():
-                continue
-            try:
-                payload = part.get_content()
-            except Exception:
-                payload = part.get_payload(decode=True)
-                if isinstance(payload, bytes):
-                    payload = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
-            if not isinstance(payload, str):
-                continue
-            if content_type == "text/plain":
-                text_parts.append(payload)
-            elif content_type == "text/html":
-                html_parts.append(html_to_text(payload))
-        if text_parts:
-            return "\n\n".join(text_parts).strip()
-        return "\n\n".join(html_parts).strip()
+def _extract_body_and_attachments(message) -> tuple[str, list[ParsedAttachment]]:
+    if not message.is_multipart():
+        payload = message.get_content()
+        if message.get_content_type() == "text/html" and isinstance(payload, str):
+            return html_to_text(payload).strip(), []
+        return str(payload or "").strip(), []
 
-    payload = message.get_content()
-    if message.get_content_type() == "text/html" and isinstance(payload, str):
-        return html_to_text(payload).strip()
-    return str(payload or "").strip()
+    text_parts: list[str] = []
+    html_parts: list[str] = []
+    attachments: list[ParsedAttachment] = []
+    for part in message.walk():
+        content_type = part.get_content_type()
+        if content_type.startswith("multipart/"):
+            continue
+        filename = part.get_filename() or ""
+        disposition = str(part.get("Content-Disposition") or "").lower()
+        is_attachment = bool(filename) or "attachment" in disposition or _looks_like_file(content_type)
+
+        if is_attachment:
+            raw = part.get_payload(decode=True)
+            if not isinstance(raw, (bytes, bytearray)):
+                raw = b""
+            attachments.append(extract_attachment(filename or "attachment", content_type, bytes(raw)))
+            continue
+
+        try:
+            payload = part.get_content()
+        except Exception:
+            payload = part.get_payload(decode=True)
+            if isinstance(payload, bytes):
+                payload = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+        if not isinstance(payload, str):
+            continue
+        if content_type == "text/plain":
+            text_parts.append(payload)
+        elif content_type == "text/html":
+            html_parts.append(html_to_text(payload))
+
+    body = "\n\n".join(text_parts).strip() if text_parts else "\n\n".join(html_parts).strip()
+    return body, attachments
+
+
+def _looks_like_file(content_type: str) -> bool:
+    main = (content_type or "").split("/", 1)[0]
+    return main in {"application", "image", "audio", "video"}

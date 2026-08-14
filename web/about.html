@@ -28,9 +28,10 @@
             <div class="step"><strong>Generate</strong>Ollama / vLLM</div>
           </div>
           <p class="help" style="margin-top: 14px">
-            Home uses Ollama. Work swaps the same OpenAI-compatible client to vLLM by changing
-            <code>ATLAS_LLM__BASE_URL</code>. Auth is a stub (<code>dev</code>) until SSO.
-            TTS is abstracted; Google TTS can be enabled in Settings when credentials exist.
+            Chat default is <strong>Microsoft Phi-3 Mini</strong> through Ollama (<code>phi3:latest</code>),
+            a 3.8B model for laptops. Ollama is the runner, not the model. Google’s small model is
+            Gemma. Switch or pull models on the <a href="/ollama.html">Ollama</a> page.
+            Work later: same client, vLLM URL in <code>.env</code>. Auth is <code>dev</code> until SSO.
           </p>
         </section>
         <section class="panel">

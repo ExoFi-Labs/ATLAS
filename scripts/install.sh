@@ -4,37 +4,39 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "==> ATLAS install"
+echo "==> ATLAS install (no Docker required)"
 
-if [[ ! -f .env ]]; then
-  cp .env.example .env
-  echo "Created .env from .env.example — review before production use."
+if ! command -v python3 >/dev/null 2>&1 && ! command -v python >/dev/null 2>&1; then
+  echo "Python 3.10+ is required."
+  exit 1
 fi
+PYTHON_BIN="$(command -v python3 || command -v python)"
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker is required. Install Docker and re-run scripts/install.sh"
+if ! command -v ollama >/dev/null 2>&1; then
+  echo "Ollama is required. Install from https://ollama.com then re-run."
   exit 1
 fi
 
-echo "==> Starting infrastructure (Qdrant, Postgres, ATLAS API)"
-docker compose up -d --build
+if [[ ! -f .env ]]; then
+  cp .env.example .env
+  echo "Created .env (chat model: Microsoft Phi-3 Mini / phi3:latest)"
+fi
+
+echo "==> Installing Python package"
+"$PYTHON_BIN" -m pip install -e .
+
+echo "==> Ensuring Phi-3 Mini is available"
+ollama pull phi3:latest
 
 cat <<'EOF'
 
-ATLAS is starting.
+ATLAS is installed.
 
-Next steps:
-1. Install Ollama locally: https://ollama.com
-2. Pull a model:         ollama pull llama3.1:8b
-3. Open the UI:          http://localhost:8080
-4. Health check:         http://localhost:8080/api/health
-5. Index sample emails:
-   docker compose exec atlas atlas ingest examples/emails
-6. Ask in the UI:        "How much PTO do employees accrue?"
+Next:
+  python -m atlas.cli ingest examples/emails
+  python -m atlas.cli serve
 
-Work migration:
-- Copy deploy/profiles/work.env.example values into .env
-- Enable vLLM profile: docker compose --profile vllm up -d
-- Switch auth:         ATLAS_AUTH__PROVIDER=oidc
+Open http://localhost:8080
+Default chat model: Microsoft Phi-3 Mini (phi3:latest) via Ollama — not Google.
 
 EOF

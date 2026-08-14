@@ -4,7 +4,7 @@ import hashlib
 import re
 from collections import defaultdict
 
-from atlas.ingestion.models import CleanedEmail, ParsedEmail
+from atlas.ingestion.models import CleanedEmail, ParsedAttachment, ParsedEmail
 from atlas.ingestion.pii import PIIScrubber, RegexPIIScrubber
 
 QUOTE_HEADER_RE = re.compile(
@@ -96,6 +96,22 @@ def clean_messages(
             body = normalize_whitespace(body)
             body, pii_hits = scrubber.scrub(body)
             body_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()
+            cleaned_attachments: list[ParsedAttachment] = []
+            for attachment in message.attachments:
+                if not attachment.text:
+                    cleaned_attachments.append(attachment)
+                    continue
+                text, extra_hits = scrubber.scrub(attachment.text)
+                for token, count in extra_hits.items():
+                    pii_hits[token] = pii_hits.get(token, 0) + count
+                cleaned_attachments.append(
+                    ParsedAttachment(
+                        filename=attachment.filename,
+                        content_type=attachment.content_type,
+                        text=text,
+                        skipped_reason=attachment.skipped_reason,
+                    )
+                )
             cleaned.append(
                 CleanedEmail(
                     message_id=message.message_id,
@@ -111,6 +127,7 @@ def clean_messages(
                     position_in_thread=position,
                     source_path=message.source_path,
                     pii_hits=pii_hits,
+                    attachments=cleaned_attachments,
                 )
             )
     return cleaned

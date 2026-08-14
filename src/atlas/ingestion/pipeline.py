@@ -18,6 +18,8 @@ class IngestResult:
     messages: int = 0
     chunks: int = 0
     skipped_empty: int = 0
+    attachments: int = 0
+    attachments_skipped: int = 0
     pii_hits: dict[str, int] = field(default_factory=dict)
     dry_run: bool = False
 
@@ -52,6 +54,8 @@ class EmailIngestionPipeline:
             messages=len(parsed),
             chunks=len(chunks),
             skipped_empty=sum(1 for item in cleaned if not item.body),
+            attachments=sum(1 for item in cleaned for att in item.attachments if att.text),
+            attachments_skipped=sum(1 for item in cleaned for att in item.attachments if att.skipped_reason),
             pii_hits=_merge_pii(cleaned),
             dry_run=dry_run,
         )

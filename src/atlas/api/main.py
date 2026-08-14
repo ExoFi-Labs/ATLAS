@@ -14,6 +14,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from atlas import __version__
 from atlas.api.envutil import WRITABLE, update_env_file
+from atlas.api.ollama import router as ollama_router
 from atlas.config import Settings, get_settings
 from atlas.ingestion.pipeline import EmailIngestionPipeline
 from atlas.providers.registry import get_registry
@@ -125,6 +126,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.include_router(ollama_router)
 
     async def current_user(authorization: str | None = Header(default=None)):
         try:
@@ -271,6 +273,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "indexed_files": result.files,
             "messages": result.messages,
             "chunks": result.chunks,
+            "attachments": result.attachments,
+            "attachments_skipped": result.attachments_skipped,
             "pii_hits": result.pii_hits,
             "saved": saved,
             "library": {"count": len(_group_sources(payloads)), "chunks": len(payloads)},

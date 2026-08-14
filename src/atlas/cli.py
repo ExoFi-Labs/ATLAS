@@ -68,6 +68,7 @@ async def _ingest(args: argparse.Namespace) -> None:
     print(f"  messages: {result.messages}")
     print(f"  chunks:   {result.chunks}")
     print(f"  empty:    {result.skipped_empty}")
+    print(f"  attach:   {result.attachments} indexed, {result.attachments_skipped} skipped")
     if result.pii_hits:
         hits = ", ".join(f"{token}={count}" for token, count in sorted(result.pii_hits.items()))
         print(f"  pii:      {hits}")
