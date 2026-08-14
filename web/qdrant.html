@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Qdrant — ATLAS</title>
+    <link rel="stylesheet" href="/css/atlas.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div id="nav"></div>
+      <div id="hero"></div>
+      <p class="lede">
+        This is the <strong>Qdrant</strong> console — the vector database ATLAS searches.
+        Each indexed email becomes one or more points in a 384-dimension space.
+        A question is embedded the same way; the nearest points become the answer’s sources.
+        Add, open, browse, or delete records here.
+      </p>
+
+      <div class="cards" id="stats"></div>
+
+      <div class="grid-2" style="margin-top: 16px">
+        <section class="panel">
+          <h2>Vector space</h2>
+          <canvas id="space" width="760" height="220"></canvas>
+          <p class="help" style="margin-top: 8px">
+            Each dot is a stored chunk. Nearby dots are similar in meaning, not in folder location.
+            The ring is a query neighbourhood — RAG pulls the closest points, not the whole archive.
+          </p>
+        </section>
+        <section class="panel">
+          <h2>How mail enters Qdrant</h2>
+          <div class="pipeline">
+            <div class="step"><strong>1</strong>.eml / .mbox</div><span class="arrow">→</span>
+            <div class="step"><strong>2</strong>Parse &amp; thread</div><span class="arrow">→</span>
+            <div class="step"><strong>3</strong>Strip quotes / PII</div><span class="arrow">→</span>
+            <div class="step"><strong>4</strong>Embed 384-d</div><span class="arrow">→</span>
+            <div class="step"><strong>5</strong>Upsert point</div>
+          </div>
+          <p class="help" id="capacity-note" style="margin-top: 14px"></p>
+          <label class="drop" id="drop-zone" style="display:block; margin-top: 14px">
+            Drop .eml / .mbox to index, or click to add
+            <input id="file-input" type="file" accept=".eml,.mbox" multiple />
+          </label>
+          <p class="flash" id="upload-status"></p>
+        </section>
+      </div>
+
+      <section class="panel" style="margin-top: 16px">
+        <h2>Collection browser</h2>
+        <input id="filter" placeholder="Filter by subject, sender, or filename…" />
+        <div style="overflow:auto; margin-top: 10px">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Subject</th>
+                <th>From</th>
+                <th>Date</th>
+                <th>Chunks</th>
+                <th>File</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-bg" id="modal">
+      <div class="modal">
+        <h3 id="modal-title">Email</h3>
+        <p class="help" id="modal-meta"></p>
+        <div class="composer" style="margin: 12px 0">
+          <button class="secondary" id="raw-btn" type="button">Open original .eml</button>
+          <button class="danger" id="delete-btn" type="button">Delete from Qdrant</button>
+          <button class="secondary" id="close-btn" type="button">Close</button>
+        </div>
+        <h2>Indexed text (what ATLAS searches)</h2>
+        <div class="raw" id="modal-text"></div>
+        <h2 style="margin-top: 16px">Original file</h2>
+        <div class="raw" id="modal-raw">Open the .eml to load raw MIME.</div>
+      </div>
+    </div>
+
+    <script src="/js/atlas.js"></script>
+    <script>
+      document.getElementById("nav").innerHTML = nav("qdrant");
+      document.getElementById("hero").innerHTML = terminal("qdrant collection · atlas_email_chunks");
+
+      let sources = [];
+      let selectedId = new URLSearchParams(location.search).get("id");
+
+      function drawSpace(items) {
+        const canvas = document.getElementById("space");
+        const ctx = canvas.getContext("2d");
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "#0a0c10";
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = "rgba(228,179,90,0.15)";
+        ctx.beginPath();
+        ctx.arc(w * 0.62, h * 0.48, 46, 0, Math.PI * 2);
+        ctx.stroke();
+        items.forEach((item, index) => {
+          const seed = [...(item.thread_id || item.message_id || String(index))].reduce((a, c) => a + c.charCodeAt(0), 0);
+          const x = 40 + (seed * 13) % (w - 80);
+          const y = 24 + (seed * 29) % (h - 48);
+          ctx.beginPath();
+          ctx.fillStyle = item.message_id === selectedId ? "#7dffb3" : "#e4b35a";
+          ctx.globalAlpha = 0.85;
+          ctx.arc(x, y, item.message_id === selectedId ? 5 : 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#8cb4ff";
+        ctx.beginPath();
+        ctx.arc(w * 0.62, h * 0.48, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function renderRows(filter = "") {
+        const q = filter.toLowerCase();
+        const body = document.getElementById("rows");
+        body.innerHTML = "";
+        sources
+          .filter((item) =>
+            `${item.subject} ${item.from} ${item.source_path}`.toLowerCase().includes(q)
+          )
+          .forEach((item) => {
+            const tr = document.createElement("tr");
+            const file = (item.source_path || "").split(/[/\\]/).pop() || "—";
+            tr.innerHTML = `<td>${item.subject}</td><td>${item.from}</td><td>${(item.date || "").slice(0, 10)}</td><td>${item.chunks}</td><td>${file}</td>`;
+            tr.addEventListener("click", () => openItem(item.message_id));
+            body.appendChild(tr);
+          });
+      }
+
+      async function refresh() {
+        const data = await api("/api/sources");
+        sources = data.sources || [];
+        const q = data.qdrant || {};
+        const cap = data.capacity || {};
+        document.getElementById("stats").innerHTML = `
+          <div class="stat"><b>${q.mode || "embedded"}</b><span>Qdrant mode</span></div>
+          <div class="stat"><b>${data.count}</b><span>Emails</span></div>
+          <div class="stat"><b>${data.chunks}</b><span>Vectors / chunks</span></div>
+          <div class="stat"><b>${q.vector_size || 384}d</b><span>Embedding size</span></div>
+          <div class="stat"><b>${bytes(cap.index_bytes_estimate)}</b><span>Index (est.)</span></div>
+          <div class="stat"><b>${(cap.comfortable_emails || 0).toLocaleString()}</b><span>Comfortable capacity</span></div>`;
+        document.getElementById("capacity-note").textContent =
+          (cap.notes && cap.notes[2]) || "Home PC capacity is tens to hundreds of thousands of emails.";
+        renderRows(document.getElementById("filter").value);
+        drawSpace(sources);
+        if (selectedId) openItem(selectedId);
+      }
+
+      async function openItem(id) {
+        selectedId = id;
+        const item = await api(`/api/sources/item?id=${encodeURIComponent(id)}`);
+        document.getElementById("modal").classList.add("open");
+        document.getElementById("modal-title").textContent = item.subject;
+        document.getElementById("modal-meta").textContent =
+          `${item.from} · ${(item.date || "").replace("T", " ").slice(0, 19)} · ${item.source_path || "path unknown"}`;
+        document.getElementById("modal-text").textContent =
+          (item.chunks || []).map((chunk) => chunk.text).join("\n\n---\n\n");
+        document.getElementById("modal-raw").textContent = item.raw_available
+          ? "Click “Open original .eml” to load the file from disk."
+          : "Original file is not on disk. Showing indexed text only.";
+        document.getElementById("raw-btn").disabled = !item.raw_available;
+        drawSpace(sources);
+      }
+
+      document.getElementById("close-btn").onclick = () => {
+        document.getElementById("modal").classList.remove("open");
+        selectedId = null;
+      };
+      document.getElementById("raw-btn").onclick = async () => {
+        if (!selectedId) return;
+        const response = await fetch(`/api/sources/raw?id=${encodeURIComponent(selectedId)}`);
+        document.getElementById("modal-raw").textContent = await response.text();
+      };
+      document.getElementById("delete-btn").onclick = async () => {
+        if (!selectedId || !confirm("Delete this email’s vectors from Qdrant?")) return;
+        await api(`/api/sources/item?id=${encodeURIComponent(selectedId)}`, { method: "DELETE" });
+        document.getElementById("modal").classList.remove("open");
+        selectedId = null;
+        await refresh();
+      };
+      document.getElementById("filter").addEventListener("input", (event) => renderRows(event.target.value));
+
+      const dropZone = document.getElementById("drop-zone");
+      const fileInput = document.getElementById("file-input");
+      async function uploadFiles(fileList) {
+        const files = Array.from(fileList || []);
+        if (!files.length) return;
+        const body = new FormData();
+        files.forEach((file) => body.append("files", file));
+        document.getElementById("upload-status").textContent = "Indexing into Qdrant…";
+        try {
+          const result = await api("/api/sources/upload", { method: "POST", body });
+          document.getElementById("upload-status").textContent =
+            `Indexed ${result.messages} message(s): ${result.saved.join(", ")}`;
+          await refresh();
+        } catch (error) {
+          document.getElementById("upload-status").textContent = error.message;
+        } finally {
+          fileInput.value = "";
+        }
+      }
+      fileInput.addEventListener("change", (event) => uploadFiles(event.target.files));
+      dropZone.addEventListener("dragover", (event) => { event.preventDefault(); dropZone.classList.add("drag"); });
+      dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag"));
+      dropZone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropZone.classList.remove("drag");
+        uploadFiles(event.dataTransfer.files);
+      });
+
+      refresh().catch((error) => {
+        document.getElementById("capacity-note").textContent = error.message;
+      });
+    </script>
+  </body>
+</html>

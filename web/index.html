@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ATLAS</title>
+    <link rel="stylesheet" href="/css/atlas.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div id="nav"></div>
+      <div id="hero"></div>
+      <p class="lede">
+        This page is the operator console. Ask about company procedure and policy.
+        ATLAS retrieves nearby email chunks from Qdrant, then answers with
+        <span id="model-name">the local model</span>. Use
+        <a href="/qdrant.html">Qdrant</a> to load mail,
+        <a href="/about.html">About</a> for specs, and
+        <a href="/settings.html">Settings</a> to tune retrieval.
+      </p>
+      <div class="grid-2">
+        <section class="panel chat-wrap">
+          <h2>Conversation</h2>
+          <div id="messages"></div>
+          <div class="composer">
+            <textarea id="input" placeholder="Ask ATLAS about procedure, departments, or policy…" rows="2"></textarea>
+            <button id="send-btn">Send</button>
+          </div>
+        </section>
+        <aside class="panel">
+          <h2>This screen</h2>
+          <p class="help">
+            Left: chat. Right: live stack. While you wait, ATLAS shows retrieve → rank → generate
+            because the local LLM often takes several seconds.
+          </p>
+          <div class="cards" style="margin-top: 12px">
+            <div class="stat"><b id="stat-model">—</b><span>LLM</span></div>
+            <div class="stat"><b id="stat-points">—</b><span>Qdrant points</span></div>
+            <div class="stat"><b id="stat-emails">—</b><span>Emails</span></div>
+          </div>
+          <p class="help" style="margin-top: 14px">
+            <a href="/qdrant.html">Open Qdrant console →</a>
+          </p>
+        </aside>
+      </div>
+    </div>
+    <script src="/js/atlas.js"></script>
+    <script>
+      document.getElementById("nav").innerHTML = nav("chat");
+      document.getElementById("hero").innerHTML = terminal("internal assistant online · grounded on company email");
+
+      const messagesEl = document.getElementById("messages");
+      const inputEl = document.getElementById("input");
+      const sendBtn = document.getElementById("send-btn");
+      const thinkStages = [
+        "searching Qdrant for nearby email vectors…",
+        "ranking retrieved chunks…",
+        "generating an answer from sources…",
+      ];
+
+      function appendMessage(text, role, citations = []) {
+        const node = document.createElement("div");
+        node.className = `msg ${role}`;
+        node.appendChild(document.createTextNode(text));
+        if (citations.length) {
+          const box = document.createElement("div");
+          box.className = "sources";
+          citations.forEach((item) => {
+            const link = document.createElement("a");
+            const id = item.message_id || item.metadata?.message_id;
+            link.href = id ? `/qdrant.html?id=${encodeURIComponent(id)}` : "/qdrant.html";
+            link.textContent = item.subject || "source";
+            box.appendChild(link);
+          });
+          node.appendChild(box);
+        }
+        messagesEl.appendChild(node);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return node;
+      }
+
+      async function loadStatus() {
+        try {
+          const [status, sources] = await Promise.all([api("/api/status"), api("/api/sources")]);
+          document.getElementById("model-name").textContent = status.llm.model;
+          document.getElementById("stat-model").textContent = status.llm.model;
+          document.getElementById("stat-points").textContent = status.qdrant.points ?? sources.chunks;
+          document.getElementById("stat-emails").textContent = sources.count;
+        } catch (error) {
+          document.getElementById("stat-model").textContent = "offline";
+        }
+      }
+
+      async function sendMessage() {
+        const message = inputEl.value.trim();
+        if (!message) return;
+        inputEl.value = "";
+        appendMessage(message, "user");
+        sendBtn.disabled = true;
+        const think = appendMessage(thinkStages[0], "think");
+        think.className = "msg think";
+        think.innerHTML = `<div class="think-row"><span class="spinner"></span><span id="think-text">${thinkStages[0]}</span></div>`;
+        let stage = 0;
+        const timer = setInterval(() => {
+          stage = Math.min(stage + 1, thinkStages.length - 1);
+          const label = document.getElementById("think-text");
+          if (label) label.textContent = thinkStages[stage];
+        }, 1800);
+
+        try {
+          const data = await api("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message }),
+          });
+          think.remove();
+          appendMessage(data.answer, "bot", data.citations || []);
+        } catch (error) {
+          think.remove();
+          appendMessage(`Error: ${error.message}`, "bot");
+        } finally {
+          clearInterval(timer);
+          sendBtn.disabled = false;
+          inputEl.focus();
+        }
+      }
+
+      sendBtn.addEventListener("click", sendMessage);
+      inputEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+      loadStatus();
+    </script>
+  </body>
+</html>

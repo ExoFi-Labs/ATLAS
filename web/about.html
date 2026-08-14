@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About — ATLAS</title>
+    <link rel="stylesheet" href="/css/atlas.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div id="nav"></div>
+      <div id="hero"></div>
+      <p class="lede">
+        ATLAS is an on-premises assistant for company procedure, departments, and policy.
+        Answers are grounded in internal email via RAG over Qdrant. This page is live from
+        the running process — not a brochure.
+      </p>
+
+      <div class="cards" id="live"></div>
+
+      <div class="grid-2" style="margin-top: 16px">
+        <section class="panel">
+          <h2>Architecture</h2>
+          <div class="pipeline">
+            <div class="step"><strong>UI</strong>Chat / Qdrant / Settings</div><span class="arrow">→</span>
+            <div class="step"><strong>API</strong>FastAPI</div><span class="arrow">→</span>
+            <div class="step"><strong>Retrieve</strong>Qdrant + bge-small</div><span class="arrow">→</span>
+            <div class="step"><strong>Generate</strong>Ollama / vLLM</div>
+          </div>
+          <p class="help" style="margin-top: 14px">
+            Home uses Ollama. Work swaps the same OpenAI-compatible client to vLLM by changing
+            <code>ATLAS_LLM__BASE_URL</code>. Auth is a stub (<code>dev</code>) until SSO.
+            TTS is abstracted; Google TTS can be enabled in Settings when credentials exist.
+          </p>
+        </section>
+        <section class="panel">
+          <h2>Email capacity</h2>
+          <p class="help" id="cap-intro"></p>
+          <ul class="help" id="cap-notes"></ul>
+        </section>
+      </div>
+
+      <section class="panel" style="margin-top: 16px">
+        <h2>Runtime specification</h2>
+        <table class="table" id="spec"></table>
+      </section>
+    </div>
+    <script src="/js/atlas.js"></script>
+    <script>
+      document.getElementById("nav").innerHTML = nav("about");
+      document.getElementById("hero").innerHTML = terminal("about · models, retrieval, capacity");
+
+      api("/api/status").then((status) => {
+        const q = status.qdrant || {};
+        const cap = status.capacity || {};
+        document.getElementById("live").innerHTML = `
+          <div class="stat"><b>${status.llm.model}</b><span>Chat model</span></div>
+          <div class="stat"><b>${status.llm.provider}</b><span>LLM provider</span></div>
+          <div class="stat"><b>${status.embeddings.model}</b><span>Embeddings</span></div>
+          <div class="stat"><b>${q.mode}</b><span>Qdrant</span></div>
+          <div class="stat"><b>${q.points}</b><span>Stored vectors</span></div>
+          <div class="stat"><b>${status.version}</b><span>ATLAS version</span></div>`;
+        document.getElementById("cap-intro").textContent =
+          `Current index ≈ ${bytes(cap.index_bytes_estimate)}. Comfortable on this home PC: about ${(cap.comfortable_emails || 0).toLocaleString()} emails. Practical ceiling before switching to a Qdrant server: about ${(cap.home_pc_ceiling_emails || 0).toLocaleString()}.`;
+        document.getElementById("cap-notes").innerHTML = (cap.notes || []).map((n) => `<li>${n}</li>`).join("");
+        const rows = [
+          ["Environment", status.env],
+          ["LLM", `${status.llm.provider} · ${status.llm.model}`],
+          ["LLM endpoint", status.llm.base_url],
+          ["Max tokens / temperature", `${status.llm.max_tokens} / ${status.llm.temperature}`],
+          ["Embeddings", `${status.embeddings.model} on ${status.embeddings.device}`],
+          ["Vector size", `${status.embeddings.vector_size || q.vector_size} dimensions, cosine`],
+          ["Collection", q.collection],
+          ["Qdrant storage", q.mode === "embedded" ? q.path : q.url],
+          ["RAG", `search ${status.rag.top_k}, keep ${status.rag.top_n}, min score ${status.rag.min_score}`],
+          ["Auth", status.auth.provider],
+          ["TTS", status.tts.provider],
+          ["STT", `${status.stt.provider} · ${status.stt.model}`],
+          ["Default ACL roles", status.ingestion.default_roles],
+        ];
+        document.getElementById("spec").innerHTML =
+          "<tr><th>Field</th><th>Value</th></tr>" +
+          rows.map(([k, v]) => `<tr><td>${k}</td><td>${v || "—"}</td></tr>`).join("");
+      }).catch((error) => {
+        document.getElementById("cap-intro").textContent = error.message;
+      });
+    </script>
+  </body>
+</html>

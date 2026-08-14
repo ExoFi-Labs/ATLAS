@@ -1,0 +1,20 @@
+MIME-Version: 1.0
+Date: Fri, 20 Mar 2026 16:18:00 +1000
+From: Sam Rivera <sam.rivera@company.internal>
+To: Helpdesk <it-helpdesk@company.internal>
+Message-ID: <it-lockout-root@company.internal>
+Subject: Account lockout procedure after MFA failures
+Content-Type: text/plain; charset="utf-8"
+
+Helpdesk playbook — please follow this order:
+
+1. Confirm the user is calling from a company number or can verify employee ID.
+2. If Azure AD shows 5 failed MFA attempts, do not reset the password first. Unlock the account and wait 15 minutes for the MFA lock to clear, or use the Authenticator reset in Entra ID.
+3. If the user lost their phone, issue a Temporary Access Pass valid for 8 hours and require a new Authenticator enrollment the same day.
+4. Never send passwords or TAP codes in email. Use Slack huddle or a phone call.
+5. Contractors must be approved by their manager in the IT ticket before any unlock.
+
+Escalate to Identity Engineering if the account is flagged for impossible travel.
+
+Sam Rivera
+IT Support

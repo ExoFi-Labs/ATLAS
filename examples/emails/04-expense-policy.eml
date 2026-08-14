@@ -1,0 +1,22 @@
+MIME-Version: 1.0
+Date: Wed, 4 Feb 2026 10:05:00 +1000
+From: Priya Nair <priya.nair@company.internal>
+To: Finance Team <finance@company.internal>
+Message-ID: <expense-policy@company.internal>
+Subject: Expense reimbursement — receipts and card use
+Content-Type: text/html; charset="utf-8"
+
+<html>
+  <body>
+    <p>Finance reminder for managers:</p>
+    <ul>
+      <li>Submit expenses within 14 days of the transaction in Coupa.</li>
+      <li>Receipts are required above $25. Itemized receipts are required for meals.</li>
+      <li>Client meals are capped at $75 per person. Alcohol needs VP approval.</li>
+      <li>Use the corporate card for travel. Personal cards are only allowed if the vendor cannot take the corporate card.</li>
+      <li>Home-office equipment over $200 must go through IT procurement, not expenses.</li>
+    </ul>
+    <p>Missing receipts will be rejected. For exceptions contact finance@company.internal or call 555-0100 and quote employee ID EMP-20481.</p>
+    <p>Priya Nair<br/>Finance Operations</p>
+  </body>
+</html>

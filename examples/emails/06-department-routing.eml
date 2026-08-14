@@ -1,0 +1,20 @@
+MIME-Version: 1.0
+Date: Tue, 7 Apr 2026 08:30:00 +1000
+From: Morgan Hale <morgan.hale@company.internal>
+To: Department Leads <leads@company.internal>
+Message-ID: <dept-routing@company.internal>
+Subject: Which team owns what — routing guide
+Content-Type: text/plain; charset="utf-8"
+
+Quick routing guide so requests stop bouncing:
+
+- People / PTO / hiring / performance: People Operations (hr@company.internal)
+- Pay, expenses, vendors, purchase orders: Finance Operations
+- Laptops, accounts, MFA, software access: IT Helpdesk
+- Customer contracts and NDAs: Legal
+- Office access badges and visitors: Workplace / Facilities
+
+If a request spans two teams, open the ticket with the primary owner and CC the second. Do not create duplicate tickets.
+
+Morgan Hale
+Chief of Staff
