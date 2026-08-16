@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="chat-page">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,132 +7,105 @@
     <link rel="stylesheet" href="/css/atlas.css" />
   </head>
   <body>
-    <div class="app">
+    <div class="app chat-app">
       <div id="nav"></div>
       <div id="hero"></div>
-      <p class="lede">
-        This page is the operator console. Ask about company procedure and policy.
-        ATLAS retrieves nearby email chunks from Qdrant, then answers with
-        <span id="model-name">the local model</span>. Use
-        <a href="/qdrant.html">Qdrant</a> to load mail,
-        <a href="/about.html">About</a> for specs, and
-        <a href="/settings.html">Settings</a> to tune retrieval.
-      </p>
-      <div class="grid-2">
-        <section class="panel chat-wrap">
-          <h2>Conversation</h2>
-          <div id="messages"></div>
-          <div class="composer">
-            <textarea id="input" placeholder="Ask ATLAS about procedure, departments, or policy…" rows="2"></textarea>
-            <button id="send-btn">Send</button>
+      <div class="chat-stage">
+        <section class="panel console">
+          <header class="console-head">
+            <div>
+              <h2>Channel</h2>
+              <p class="help" id="channel-meta">operator uplink · grounded on company email</p>
+            </div>
+            <div class="console-actions">
+              <span class="link-lamp" id="voice-lamp" data-mode="idle">idle</span>
+              <button class="ghost-btn" id="clear-btn" type="button">Clear</button>
+            </div>
+          </header>
+          <div id="messages">
+            <div class="empty-channel" id="empty">
+              <p class="prompt-line">&gt; standing by<span class="cursor"></span></p>
+              <h3>How can I help?</h3>
+              <p>Ask about procedure, credits, logistics, or policy. Type, or tap the mic for two-way voice.</p>
+            </div>
+          </div>
+          <div class="composer-shell">
+            <div class="status-bar">
+              <p class="mic-status" id="mic-status"></p>
+              <p class="composer-hint">Enter to send · Shift+Enter for a new line · click or hold the mic</p>
+            </div>
+            <div class="composer console-composer">
+              <button class="mic-btn" id="mic-btn" type="button" title="Click to talk, hold for push-to-talk" aria-label="Microphone">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Zm7 9a7 7 0 0 1-14 0M12 19v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </button>
+              <textarea id="input" placeholder="Message ATLAS…" rows="1"></textarea>
+              <div class="composer-tools">
+                <button class="icon-stop" id="stop-audio" type="button" title="Stop speaking" aria-label="Stop audio">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"/></svg>
+                </button>
+                <button class="send-btn" id="send-btn" type="button">Send</button>
+              </div>
+            </div>
           </div>
         </section>
-        <aside class="panel">
-          <h2>This screen</h2>
-          <p class="help">
-            Left: chat. Right: live stack. While you wait, ATLAS shows retrieve → rank → generate
-            because the local LLM often takes several seconds.
-          </p>
-          <div class="cards" style="margin-top: 12px">
-            <div class="stat"><b id="stat-model">—</b><span>LLM</span></div>
-            <div class="stat"><b id="stat-points">—</b><span>Qdrant points</span></div>
-            <div class="stat"><b id="stat-emails">—</b><span>Emails</span></div>
-          </div>
-          <p class="help" style="margin-top: 14px">
-            <a href="/qdrant.html">Open Qdrant console →</a>
-          </p>
+        <aside class="rack">
+          <section class="panel stack-card">
+            <h2>Live stack</h2>
+            <div class="stack-grid">
+              <div class="stat"><b id="stat-model">—</b><span>Model</span></div>
+              <div class="stat"><b id="stat-points">—</b><span>Vectors</span></div>
+              <div class="stat"><b id="stat-emails">—</b><span>Emails</span></div>
+            </div>
+            <a class="rack-link" href="/qdrant.html">Open Qdrant →</a>
+          </section>
+          <section class="panel voice-card">
+            <header class="voice-head">
+              <div>
+                <h2>Voice</h2>
+                <p class="help" id="voice-hint">Browser speech in · browser voice out</p>
+              </div>
+              <button class="ghost-btn" id="stop-btn" type="button">Stop</button>
+            </header>
+            <div class="deck">
+              <label class="toggle">
+                <input type="checkbox" id="two-way" />
+                <i></i>
+                <span><b>Hands-free</b><small>Listen → speak → listen</small></span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="speak-replies" />
+                <i></i>
+                <span><b>Speak replies</b><small>Read every answer aloud</small></span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="auto-send" checked />
+                <i></i>
+                <span><b>Auto-send</b><small>Transmit when you pause</small></span>
+              </label>
+              <div class="voice-pick">
+                <label>Voice</label>
+                <div class="voice-row">
+                  <select id="voice-select"></select>
+                  <button class="ghost-btn" id="preview-voice" type="button">Preview</button>
+                </div>
+              </div>
+              <div class="slider-row">
+                <label>Silence <b id="silence-label">700 ms</b></label>
+                <input id="silence-ms" type="range" min="250" max="1600" step="50" value="700" />
+              </div>
+              <div class="slider-row">
+                <label>Rate <b id="rate-label">1.05×</b></label>
+                <input id="speak-rate" type="range" min="0.7" max="1.4" step="0.05" value="1.05" />
+              </div>
+              <div class="vu" id="vu" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+          </section>
         </aside>
       </div>
     </div>
     <script src="/js/atlas.js"></script>
-    <script>
-      document.getElementById("nav").innerHTML = nav("chat");
-      document.getElementById("hero").innerHTML = terminal("internal assistant online · grounded on company email");
-
-      const messagesEl = document.getElementById("messages");
-      const inputEl = document.getElementById("input");
-      const sendBtn = document.getElementById("send-btn");
-      const thinkStages = [
-        "searching Qdrant for nearby email vectors…",
-        "ranking retrieved chunks…",
-        "generating an answer from sources…",
-      ];
-
-      function appendMessage(text, role, citations = []) {
-        const node = document.createElement("div");
-        node.className = `msg ${role}`;
-        node.appendChild(document.createTextNode(text));
-        if (citations.length) {
-          const box = document.createElement("div");
-          box.className = "sources";
-          citations.forEach((item) => {
-            const link = document.createElement("a");
-            const id = item.message_id || item.metadata?.message_id;
-            link.href = id ? `/qdrant.html?id=${encodeURIComponent(id)}` : "/qdrant.html";
-            link.textContent = item.subject || "source";
-            box.appendChild(link);
-          });
-          node.appendChild(box);
-        }
-        messagesEl.appendChild(node);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-        return node;
-      }
-
-      async function loadStatus() {
-        try {
-          const [status, sources] = await Promise.all([api("/api/status"), api("/api/sources")]);
-          document.getElementById("model-name").textContent = status.llm.model;
-          document.getElementById("stat-model").textContent = status.llm.model;
-          document.getElementById("stat-points").textContent = status.qdrant.points ?? sources.chunks;
-          document.getElementById("stat-emails").textContent = sources.count;
-        } catch (error) {
-          document.getElementById("stat-model").textContent = "offline";
-        }
-      }
-
-      async function sendMessage() {
-        const message = inputEl.value.trim();
-        if (!message) return;
-        inputEl.value = "";
-        appendMessage(message, "user");
-        sendBtn.disabled = true;
-        const think = appendMessage(thinkStages[0], "think");
-        think.className = "msg think";
-        think.innerHTML = `<div class="think-row"><span class="spinner"></span><span id="think-text">${thinkStages[0]}</span></div>`;
-        let stage = 0;
-        const timer = setInterval(() => {
-          stage = Math.min(stage + 1, thinkStages.length - 1);
-          const label = document.getElementById("think-text");
-          if (label) label.textContent = thinkStages[stage];
-        }, 1800);
-
-        try {
-          const data = await api("/api/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message }),
-          });
-          think.remove();
-          appendMessage(data.answer, "bot", data.citations || []);
-        } catch (error) {
-          think.remove();
-          appendMessage(`Error: ${error.message}`, "bot");
-        } finally {
-          clearInterval(timer);
-          sendBtn.disabled = false;
-          inputEl.focus();
-        }
-      }
-
-      sendBtn.addEventListener("click", sendMessage);
-      inputEl.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" && !event.shiftKey) {
-          event.preventDefault();
-          sendMessage();
-        }
-      });
-      loadStatus();
-    </script>
+    <script src="/js/chat.js"></script>
   </body>
 </html>

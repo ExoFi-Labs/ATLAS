@@ -48,7 +48,7 @@ Docker is **optional** (Qdrant server + vLLM later). This PC uses embedded Qdran
 
 | Page | What it is |
 |------|------------|
-| **Chat** | Ask questions. ATLAS searches Qdrant, then answers with the Ollama model. |
+| **Chat** | Operator console. Type or speak. ATLAS searches Qdrant, then answers (optional TTS). |
 | **Qdrant** | Vector database. Upload `.eml` / `.mbox`, browse, open, delete. |
 | **Ollama** | Models on this PC. Pull Phi / Llama / Gemma, inspect Modelfiles, switch the chat model. |
 | **About** | Live specs and email capacity. |
@@ -99,7 +99,8 @@ Swap backends with `.env`. Chat, RAG, and the UI never import Ollama or vLLM dir
 | Chat LLM | Ollama + **Phi-3 Mini** | vLLM + larger instruct model |
 | Vectors | Qdrant embedded (`data/qdrant`) | Qdrant server |
 | Auth | `dev` user | OIDC (Azure AD / Okta) |
-| TTS | off, or Google Cloud TTS | same |
+| TTS | off, or Google Cloud TTS (browser fallback in chat) | same |
+| STT | faster-whisper + Silero VAD | same |
 
 ```env
 ATLAS_LLM__PROVIDER=ollama
@@ -120,7 +121,8 @@ Copy `.env.example` to `.env` (the install script does this).
 | `ATLAS_LLM__BASE_URL` | `http://127.0.0.1:11434/v1` |
 | `ATLAS_VECTOR__PATH` | Embedded Qdrant folder. Empty = use `ATLAS_VECTOR__URL` |
 | `ATLAS_AUTH__PROVIDER` | `dev` or `oidc` |
-| `ATLAS_TTS__PROVIDER` | `none` or `google` |
+| `ATLAS_TTS__PROVIDER` | `none` (browser voice in chat) or `google` |
+| `ATLAS_STT__PROVIDER` | `whisper` or `none` |
 
 Do not commit `.env`. Local index lives in `data/` and is gitignored.
 
@@ -130,6 +132,8 @@ Do not commit `.env`. Local index lives in `data/` and is gitignored.
 |----------|-------------|
 | `GET /api/health` | Process is up |
 | `POST /api/chat` | RAG chat |
+| `POST /api/voice/transcribe` | Whisper + Silero VAD |
+| `POST /api/voice/synthesize` | Google TTS; chat falls back to the browser voice |
 | `GET /api/sources` | Qdrant email list |
 | `GET /api/ollama/status` | Local Ollama models |
 | `GET /api/ollama/catalog` | Laptop shortlist |
@@ -138,8 +142,8 @@ Do not commit `.env`. Local index lives in `data/` and is gitignored.
 ## Roadmap
 
 - [x] Email ingestion, Qdrant console, Ollama model manager
+- [x] Chat voice deck (Whisper, Silero VAD, Google / browser TTS)
 - [ ] OIDC (Azure AD / Okta)
-- [ ] Silero VAD + voice UI
 - [ ] Hybrid BM25 + reranker
 
 ## License

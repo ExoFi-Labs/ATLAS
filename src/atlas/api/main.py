@@ -36,6 +36,12 @@ class ChatResponseBody(BaseModel):
     citations: list[dict]
 
 
+class SynthesizeRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+    speaking_rate: float | None = Field(default=None, ge=0.5, le=2.0)
+    voice: str | None = None
+
+
 class SettingsUpdate(BaseModel):
     values: dict[str, str]
 
@@ -189,7 +195,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def public_config():
         return {
             "name": "ATLAS",
-            "voice_enabled": settings.stt.provider != "none" and settings.tts.provider != "none",
+            "voice_enabled": settings.stt.provider != "none" or settings.tts.provider != "none",
+            "tts": {
+                "provider": settings.tts.provider,
+                "voice": settings.tts.google_voice,
+                "speaking_rate": settings.tts.speaking_rate,
+            },
+            "stt": {
+                "provider": settings.stt.provider,
+                "model": settings.stt.whisper_model,
+                "vad": settings.stt.vad,
+                "vad_threshold": settings.stt.vad_threshold,
+                "vad_min_silence_ms": settings.stt.vad_min_silence_ms,
+            },
             "auth_provider": settings.auth.provider,
         }
 
@@ -294,8 +312,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "ATLAS_RAG__MIN_SCORE": str(settings.rag.min_score),
                 "ATLAS_TTS__PROVIDER": settings.tts.provider,
                 "ATLAS_TTS__GOOGLE_VOICE": settings.tts.google_voice,
+                "ATLAS_TTS__SPEAKING_RATE": str(settings.tts.speaking_rate),
                 "ATLAS_STT__PROVIDER": settings.stt.provider,
                 "ATLAS_STT__WHISPER_MODEL": settings.stt.whisper_model,
+                "ATLAS_STT__VAD": "true" if settings.stt.vad else "false",
+                "ATLAS_STT__VAD_THRESHOLD": str(settings.stt.vad_threshold),
+                "ATLAS_STT__VAD_MIN_SILENCE_MS": str(settings.stt.vad_min_silence_ms),
                 "ATLAS_INGESTION__DEFAULT_ROLES": settings.ingestion.default_roles,
                 "ATLAS_INGESTION__DEFAULT_DEPARTMENT": settings.ingestion.default_department,
                 "ATLAS_AUTH__DEV_ROLES": settings.auth.dev_roles,
@@ -329,10 +351,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings.tts.provider = body.values["ATLAS_TTS__PROVIDER"]  # type: ignore[assignment]
         if "ATLAS_TTS__GOOGLE_VOICE" in written:
             settings.tts.google_voice = body.values["ATLAS_TTS__GOOGLE_VOICE"]
+        if "ATLAS_TTS__SPEAKING_RATE" in written:
+            settings.tts.speaking_rate = float(body.values["ATLAS_TTS__SPEAKING_RATE"])
         if "ATLAS_STT__PROVIDER" in written:
             settings.stt.provider = body.values["ATLAS_STT__PROVIDER"]  # type: ignore[assignment]
         if "ATLAS_STT__WHISPER_MODEL" in written:
             settings.stt.whisper_model = body.values["ATLAS_STT__WHISPER_MODEL"]
+        if "ATLAS_STT__VAD" in written:
+            settings.stt.vad = body.values["ATLAS_STT__VAD"].strip().lower() in {"1", "true", "yes", "on"}
+        if "ATLAS_STT__VAD_THRESHOLD" in written:
+            settings.stt.vad_threshold = float(body.values["ATLAS_STT__VAD_THRESHOLD"])
+        if "ATLAS_STT__VAD_MIN_SILENCE_MS" in written:
+            settings.stt.vad_min_silence_ms = int(float(body.values["ATLAS_STT__VAD_MIN_SILENCE_MS"]))
         if "ATLAS_INGESTION__DEFAULT_ROLES" in written:
             settings.ingestion.default_roles = body.values["ATLAS_INGESTION__DEFAULT_ROLES"]
         if "ATLAS_INGESTION__DEFAULT_DEPARTMENT" in written:
@@ -375,12 +405,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/voice/transcribe")
     async def transcribe(file: UploadFile = File(...), user=Depends(current_user)):
         audio = await file.read()
-        text = await registry.stt.transcribe(audio, mime_type=file.content_type or "audio/wav")
-        return {"text": text}
+        if not audio:
+            raise HTTPException(status_code=400, detail="Empty audio")
+        try:
+            text = await registry.stt.transcribe(audio, mime_type=file.content_type or "audio/webm")
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Transcription failed: {exc}") from exc
+        return {
+            "text": text,
+            "vad": settings.stt.vad,
+            "engine": "silero+whisper" if settings.stt.provider == "whisper" else settings.stt.provider,
+        }
 
     @app.post("/api/voice/synthesize")
-    async def synthesize(body: ChatRequest, user=Depends(current_user)):
-        audio = await registry.tts.synthesize(body.message)
+    async def synthesize(body: SynthesizeRequest, user=Depends(current_user)):
+        try:
+            audio = await registry.tts.synthesize(
+                body.message,
+                speaking_rate=body.speaking_rate,
+                voice=body.voice,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"TTS failed: {exc}") from exc
         return Response(content=audio, media_type="audio/mpeg")
 
     app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")

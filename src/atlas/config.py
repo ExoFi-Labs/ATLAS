@@ -45,15 +45,19 @@ class RAGSettings(BaseModel):
 
 class TTSSettings(BaseModel):
     provider: Literal["google", "none"] = "google"
-    google_voice: str = "en-US-Neural2-J"
-    google_language: str = "en-US"
+    google_voice: str = "en-AU-Chirp3-HD-Kore"
+    google_language: str = "en-AU"
     google_credentials_file: str = ""
+    speaking_rate: float = 1.05
 
 
 class STTSettings(BaseModel):
     provider: Literal["whisper", "none"] = "whisper"
     whisper_model: str = "base"
     whisper_device: str = "cpu"
+    vad: bool = True
+    vad_threshold: float = 0.5
+    vad_min_silence_ms: int = 500
 
 
 class IngestionSettings(BaseModel):

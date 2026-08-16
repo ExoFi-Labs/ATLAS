@@ -76,7 +76,13 @@ class VectorStoreProvider(Protocol):
 
 
 class TTSProvider(Protocol):
-    async def synthesize(self, text: str) -> bytes: ...
+    async def synthesize(
+        self,
+        text: str,
+        *,
+        speaking_rate: float | None = None,
+        voice: str | None = None,
+    ) -> bytes: ...
 
 
 class STTProvider(Protocol):

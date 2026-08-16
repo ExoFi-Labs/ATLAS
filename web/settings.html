@@ -45,11 +45,25 @@
           <div>
             <label>TTS provider</label>
             <select name="ATLAS_TTS__PROVIDER">
-              <option value="none">none</option>
+              <option value="none">none (browser voice in chat)</option>
               <option value="google">google</option>
             </select>
           </div>
-          <div><label>Google voice</label><input name="ATLAS_TTS__GOOGLE_VOICE" /></div>
+          <div>
+            <label>Google voice</label>
+            <select name="ATLAS_TTS__GOOGLE_VOICE">
+              <option value="en-AU-Chirp3-HD-Kore">AU Chirp 3 HD · Kore (recommended)</option>
+              <option value="en-AU-Chirp3-HD-Aoede">AU Chirp 3 HD · Aoede</option>
+              <option value="en-AU-Chirp3-HD-Charon">AU Chirp 3 HD · Charon</option>
+              <option value="en-AU-Chirp3-HD-Fenrir">AU Chirp 3 HD · Fenrir</option>
+              <option value="en-US-Chirp3-HD-Kore">US Chirp 3 HD · Kore</option>
+              <option value="en-US-Chirp3-HD-Charon">US Chirp 3 HD · Charon</option>
+              <option value="en-US-Studio-O">US Studio · O (broadcast)</option>
+              <option value="en-AU-Neural2-C">AU Neural2 · C</option>
+              <option value="en-US-Neural2-J">US Neural2 · J</option>
+            </select>
+          </div>
+          <div><label>Speaking rate</label><input name="ATLAS_TTS__SPEAKING_RATE" type="number" step="0.05" min="0.5" max="2" /></div>
           <div>
             <label>STT provider</label>
             <select name="ATLAS_STT__PROVIDER">
@@ -58,7 +72,20 @@
             </select>
           </div>
           <div><label>Whisper model</label><input name="ATLAS_STT__WHISPER_MODEL" /></div>
+          <div>
+            <label>Silero VAD</label>
+            <select name="ATLAS_STT__VAD">
+              <option value="true">on</option>
+              <option value="false">off</option>
+            </select>
+          </div>
+          <div><label>VAD threshold</label><input name="ATLAS_STT__VAD_THRESHOLD" type="number" step="0.05" min="0.1" max="0.9" /></div>
+          <div><label>VAD silence (ms)</label><input name="ATLAS_STT__VAD_MIN_SILENCE_MS" type="number" step="50" min="200" max="2000" /></div>
         </div>
+        <p class="help">
+          Chat uses browser speech or Whisper in, then Google <strong>Chirp 3 HD</strong> (Kore) when TTS is google.
+          Neural2 is the older general-purpose tier. Missing GCP credentials fall back to the browser voice.
+        </p>
 
         <h2 style="margin-top: 22px">Ingest &amp; access</h2>
         <div class="form-grid">
