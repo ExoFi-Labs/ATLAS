@@ -12,6 +12,7 @@ from atlas.providers.stt.whisper import (
     wav_to_float32,
 )
 from atlas.providers.tts.google import language_for_voice
+from atlas.textprep import for_display, for_speech
 
 
 def _wav_bytes(samples: np.ndarray, rate: int = 16000) -> bytes:
@@ -56,3 +57,29 @@ def test_wav_roundtrip_and_resample():
 def test_language_from_google_voice_name():
     assert language_for_voice("en-AU-Chirp3-HD-Kore") == "en-AU"
     assert language_for_voice("en-US-Studio-O") == "en-US"
+
+
+def test_for_speech_strips_markdown_and_citations():
+    spoken = for_speech(
+        "**Action steps (SOP-CS-018):**\n"
+        "1. **Customer instructions**: Tell them to **not use the stock**.\n"
+        "Reason: *damaged in transit*.\n"
+        "**Policy source**: [1] SOP-CS-018."
+    )
+    assert "*" not in spoken
+    assert "[" not in spoken
+    assert "not use the stock" in spoken
+    assert "damaged in transit" in spoken
+    assert "SOP CS 018" in spoken
+
+
+def test_for_display_strips_asterisks_keeps_citations():
+    shown = for_display(
+        "**Action Steps:**\n"
+        "1. **Raise an RA** the same day [1].\n"
+        "Use **ATP** stock."
+    )
+    assert "*" not in shown
+    assert "[1]" in shown
+    assert "Raise an RA" in shown
+    assert "ATP" in shown

@@ -1,5 +1,12 @@
+from atlas.config import OrgSettings
 from atlas.providers.base import RetrievedChunk
-from atlas.rag.pipeline import compose_search_query, extract_identifiers, retrieval_queries, select_chunks
+from atlas.rag.pipeline import (
+    compose_search_query,
+    extract_identifiers,
+    retrieval_queries,
+    select_chunks,
+    system_prompt_for,
+)
 
 
 def _chunk(text: str, score: float, message_id: str) -> RetrievedChunk:
@@ -22,6 +29,36 @@ def test_extract_identifiers():
     assert "RA-24100" in ids
     assert "451112223" in ids
     assert "INV-910001" in ids
+
+
+def test_system_prompt_switches_reply_length():
+    org = OrgSettings()
+    short = system_prompt_for(org, "short")
+    regular = system_prompt_for(org, "regular")
+    assert "SHORT" in short
+    assert "few short sentences" in short
+    assert "Do not use bullets" in short
+    assert "REGULAR" in regular
+    assert "few short sentences" not in regular
+
+
+def test_system_prompt_switches_staff_role():
+    org = OrgSettings()
+    cs = system_prompt_for(org, staff_role="customer_service")
+    sales = system_prompt_for(org, staff_role="sales")
+    unknown = system_prompt_for(org, staff_role="warehouse")
+    assert "Desk: Customer Service" in cs
+    assert "on the phone or email with the customer" in cs
+    assert "Desk: Salesperson" in sales
+    assert "Do not promise DC stock" in sales
+    assert "Desk: Customer Service" in unknown
+    assert "Desk: Salesperson" not in cs
+    accounts = system_prompt_for(org, staff_role="accounts")
+    purchasing = system_prompt_for(org, staff_role="purchasing")
+    logistics = system_prompt_for(org, staff_role="logistics")
+    assert "Accounts Receivable or Credits" in accounts
+    assert "purchasing officer" in purchasing
+    assert "logistics or TMS" in logistics
 
 
 def test_compose_search_query_uses_prior_user_turn():

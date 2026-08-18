@@ -26,7 +26,7 @@
             <div class="step"><strong>1</strong>.eml / .mbox</div><span class="arrow">→</span>
             <div class="step"><strong>2</strong>Parse and thread</div><span class="arrow">→</span>
             <div class="step"><strong>3</strong>Strip quotes / PII</div><span class="arrow">→</span>
-            <div class="step"><strong>4</strong>Embed 384-d</div><span class="arrow">→</span>
+            <div class="step"><strong>4</strong>Embed 384 dimensions</div><span class="arrow">→</span>
             <div class="step"><strong>5</strong>Upsert point</div>
           </div>
           <p class="help" id="capacity-note" style="margin-top: 14px"></p>
@@ -76,7 +76,7 @@
       </div>
     </div>
 
-    <script src="/js/atlas.js?v=ui14"></script>
+    <script src="/js/atlas.js?v=ui16"></script>
     <script>
       document.getElementById("nav").innerHTML = nav("qdrant");
       document.getElementById("hero").innerHTML = terminal("Qdrant");
@@ -118,11 +118,11 @@
           <div class="stat"><b>${q.mode || "embedded"}</b><span>Qdrant mode</span></div>
           <div class="stat"><b>${data.count}</b><span>Emails</span></div>
           <div class="stat"><b>${data.chunks}</b><span>Vectors / chunks</span></div>
-          <div class="stat"><b>${q.vector_size || 384}d</b><span>Embedding size</span></div>
+          <div class="stat"><b>${q.vector_size || cap.vector_dimensions || 384}</b><span>Embedding dimensions</span></div>
           <div class="stat"><b>${bytes(cap.index_bytes_estimate)}</b><span>Index (est.)</span></div>
-          <div class="stat"><b>${(cap.comfortable_emails || 0).toLocaleString()}</b><span>Comfortable capacity</span></div>`;
+          <div class="stat"><b>${(cap.capacity_emails || cap.comfortable_emails || 0).toLocaleString()}</b><span>Capacity</span></div>`;
         document.getElementById("capacity-note").textContent =
-          (cap.notes && cap.notes[2]) || "Home PC capacity is tens to hundreds of thousands of emails.";
+          (cap.notes && cap.notes[2]) || "Capacity is estimated from embedding size and a 2 GB index budget.";
         renderRows(document.getElementById("filter").value);
         if (selectedId) openItem(selectedId);
       }

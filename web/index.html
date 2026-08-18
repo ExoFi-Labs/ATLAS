@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chat — ATLAS</title>
-    <link rel="stylesheet" href="/css/atlas.css?v=ui12" />
+    <link rel="stylesheet" href="/css/atlas.css?v=ui16" />
   </head>
   <body>
     <a class="skip-link" href="#messages">Skip to conversation</a>
@@ -19,6 +19,20 @@
               <p class="help" id="channel-meta">Answers are grounded on company email</p>
             </div>
             <div class="console-actions">
+              <label class="role-switch">
+                <span>Role</span>
+                <select id="staff-role" aria-label="Desk role">
+                  <option value="customer_service">Customer Service</option>
+                  <option value="accounts">Accounts</option>
+                  <option value="sales">Salesperson</option>
+                  <option value="purchasing">Purchasing</option>
+                  <option value="logistics">Logistics</option>
+                </select>
+              </label>
+              <div class="length-switch" role="group" aria-label="Reply length">
+                <button type="button" id="length-regular" data-length="regular">Regular</button>
+                <button type="button" id="length-short" data-length="short">Short</button>
+              </div>
               <span class="link-lamp" id="voice-lamp" data-mode="idle">Idle</span>
               <button class="ghost-btn" id="clear-btn" type="button">Clear</button>
             </div>
@@ -27,7 +41,7 @@
             <div class="empty-channel" id="empty">
               <p class="prompt-line">Ready</p>
               <h3>How can I help?</h3>
-              <p>Ask about procedure, credits, logistics, or policy. Type a question, or use the microphone for voice.</p>
+              <p>Pick a desk role, then ask about procedure, credits, logistics, or policy. Type a question, or use the microphone for voice.</p>
             </div>
           </div>
           <div class="composer-shell">
@@ -70,17 +84,17 @@
             <div class="deck">
               <label class="toggle">
                 <input type="checkbox" id="two-way" />
-                <i aria-hidden="true"></i>
+                <span class="switch" aria-hidden="true"></span>
                 <span><b>Hands-free</b><small>Listen, speak, then listen again</small></span>
               </label>
               <label class="toggle">
                 <input type="checkbox" id="speak-replies" />
-                <i aria-hidden="true"></i>
+                <span class="switch" aria-hidden="true"></span>
                 <span><b>Speak replies</b><small>Read every answer aloud</small></span>
               </label>
               <label class="toggle">
                 <input type="checkbox" id="auto-send" checked />
-                <i aria-hidden="true"></i>
+                <span class="switch" aria-hidden="true"></span>
                 <span><b>Auto-send</b><small>Send when you pause</small></span>
               </label>
               <div class="voice-pick">
@@ -125,7 +139,7 @@
         <div class="raw" id="source-raw-text">Indexed text is what ATLAS searched. Open the original .eml if you need headers and MIME.</div>
       </div>
     </div>
-    <script src="/js/atlas.js?v=ui14"></script>
-    <script src="/js/chat.js?v=ui13"></script>
+    <script src="/js/atlas.js?v=ui16"></script>
+    <script src="/js/chat.js?v=ui18"></script>
   </body>
 </html>

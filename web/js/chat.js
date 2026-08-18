@@ -1,7 +1,19 @@
+const STAFF_ROLES = {
+  customer_service: "Customer Service",
+  accounts: "Accounts",
+  sales: "Salesperson",
+  purchasing: "Purchasing",
+  logistics: "Logistics",
+};
+
 const prefs = {
   speak: localStorage.getItem("atlas.speakReplies") === "true",
   autoSend: localStorage.getItem("atlas.autoSend") !== "false",
   twoWay: localStorage.getItem("atlas.twoWay") === "true",
+  length: localStorage.getItem("atlas.replyLength") === "short" ? "short" : "regular",
+  staffRole: STAFF_ROLES[localStorage.getItem("atlas.staffRole")]
+    ? localStorage.getItem("atlas.staffRole")
+    : "customer_service",
   silenceMs: Number(localStorage.getItem("atlas.silenceMs") || 700),
   rate: Number(localStorage.getItem("atlas.speakRate") || 1.05),
 };
@@ -43,6 +55,8 @@ const speakReplies = document.getElementById("speak-replies");
 const autoSend = document.getElementById("auto-send");
 const silenceMs = document.getElementById("silence-ms");
 const speakRate = document.getElementById("speak-rate");
+const staffRoleEl = document.getElementById("staff-role");
+const channelMeta = document.getElementById("channel-meta");
 
 document.getElementById("nav").innerHTML = nav("chat");
 document.getElementById("hero").innerHTML = terminal("Chat");
@@ -53,13 +67,30 @@ twoWay.checked = prefs.twoWay;
 silenceMs.value = String(prefs.silenceMs);
 speakRate.value = String(prefs.rate);
 syncLabels();
+syncLength();
+syncRole();
 
 function persist() {
   localStorage.setItem("atlas.speakReplies", String(prefs.speak));
   localStorage.setItem("atlas.autoSend", String(prefs.autoSend));
   localStorage.setItem("atlas.twoWay", String(prefs.twoWay));
+  localStorage.setItem("atlas.replyLength", prefs.length);
+  localStorage.setItem("atlas.staffRole", prefs.staffRole);
   localStorage.setItem("atlas.silenceMs", String(prefs.silenceMs));
   localStorage.setItem("atlas.speakRate", String(prefs.rate));
+}
+
+function syncRole() {
+  if (staffRoleEl) staffRoleEl.value = prefs.staffRole;
+  if (channelMeta) {
+    channelMeta.textContent = `Answering for ${STAFF_ROLES[prefs.staffRole]} · grounded on company email`;
+  }
+}
+
+function syncLength() {
+  document.querySelectorAll(".length-switch button").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.length === prefs.length));
+  });
 }
 
 function syncLabels() {
@@ -267,7 +298,12 @@ async function sendMessage(text) {
     const data = await api("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, history: conversation.slice(-6) }),
+      body: JSON.stringify({
+        message,
+        history: conversation.slice(-6),
+        length: prefs.length,
+        staff_role: prefs.staffRole,
+      }),
     });
     think.remove();
     conversation.push({ role: "user", content: message });
@@ -333,13 +369,32 @@ function haltAudio() {
   setStatus("");
 }
 
+function forSpeech(text) {
+  return String(text || "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[[0-9,\s]+\]/g, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/(^|[^\w])\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, "$1$2")
+    .replace(/(^|[^\w])_(?!\s)(.+?)(?<!\s)_(?!\w)/g, "$1$2")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*>\s+/gm, "")
+    .replace(/^---+$/gm, "")
+    .replace(/\bSOP-([A-Za-z]+)-(\d+)\b/gi, "SOP $1 $2")
+    .replace(/[*_~`#]+/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 async function speak(text, { loop = false } = {}) {
   stopSpeaking();
   cancelled = false;
   const gen = speakGen;
-  const spoken = String(text || "")
-    .replace(/\[[0-9]+\]/g, "")
-    .trim();
+  const spoken = forSpeech(text);
   if (!spoken) return;
   setLamp("speak", "Speaking");
   setSpeaking(true);
@@ -355,7 +410,11 @@ async function speak(text, { loop = false } = {}) {
             voice: prefs.voice || undefined,
           }),
         });
-        if (!response.ok) throw new Error("Google TTS unavailable");
+        const errBody = await response.clone().json().catch(() => ({}));
+        if (!response.ok) {
+          const detail = typeof errBody.detail === "string" ? errBody.detail : "Google TTS unavailable";
+          throw new Error(detail);
+        }
         if (gen !== speakGen) return;
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
@@ -373,8 +432,7 @@ async function speak(text, { loop = false } = {}) {
         URL.revokeObjectURL(url);
       } catch (error) {
         if (gen === speakGen) {
-          setStatus(`${error.message}. Browser voice standing in.`);
-          await speakBrowser(spoken, gen);
+          setStatus(error.message || "Google TTS failed.");
         }
       }
     } else {
@@ -741,6 +799,20 @@ function clearChannel() {
 }
 
 document.getElementById("clear-btn").addEventListener("click", clearChannel);
+document.querySelectorAll(".length-switch button").forEach((button) => {
+  button.addEventListener("click", () => {
+    prefs.length = button.dataset.length === "short" ? "short" : "regular";
+    syncLength();
+    persist();
+  });
+});
+if (staffRoleEl) {
+  staffRoleEl.addEventListener("change", () => {
+    prefs.staffRole = STAFF_ROLES[staffRoleEl.value] ? staffRoleEl.value : "customer_service";
+    syncRole();
+    persist();
+  });
+}
 document.getElementById("stop-btn").addEventListener("click", () => {
   haltAudio();
   if (listening) stopListening(false);

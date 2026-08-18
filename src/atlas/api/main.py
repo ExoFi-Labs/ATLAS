@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from typing import Literal
 
@@ -29,6 +29,19 @@ ALLOWED_SUFFIXES = {".eml", ".mbox"}
 SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
+def _tts_error(exc: Exception) -> str:
+    text = str(exc)
+    lowered = text.lower()
+    if "billing" in lowered or "BILLING_DISABLED" in text:
+        return (
+            "Google TTS needs billing enabled on the Cloud project before Chirp voices will speak. "
+            "Enable billing, wait a few minutes, then try again."
+        )
+    if "403" in text or "permission" in lowered or "unauthenticated" in lowered:
+        return "Google TTS credentials were rejected. Check the service account JSON and that the Text-to-Speech API is enabled."
+    return f"Google TTS failed: {text[:240]}"
+
+
 class ChatTurn(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=8000)
@@ -37,6 +50,10 @@ class ChatTurn(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     history: list[ChatTurn] = Field(default_factory=list, max_length=12)
+    length: Literal["regular", "short"] = "regular"
+    staff_role: Literal[
+        "customer_service", "accounts", "sales", "purchasing", "logistics"
+    ] = "customer_service"
 
 
 class ChatResponseBody(BaseModel):
@@ -102,25 +119,47 @@ def _safe_existing_file(source_path: str) -> Path:
     return resolved
 
 
-def _capacity(points: int, vector_size: int) -> dict:
-    dims = vector_size or 384
-    bytes_per_vector = dims * 4
-    payload_estimate = 2500
-    per_chunk = bytes_per_vector + payload_estimate
-    used = points * per_chunk
+def _dir_bytes(path: str) -> int:
+    root = Path(path or "")
+    if not path or not root.exists():
+        return 0
+    return sum(item.stat().st_size for item in root.rglob("*") if item.is_file())
+
+
+def _capacity(points: int, vector_size: int, disk_bytes: int = 0) -> dict:
+    """Estimate how many email chunks this machine can hold in embedded Qdrant.
+
+    Not a hard quota. Uses vector width, HNSW overhead, and a 2 GB index budget.
+    When the collection already has data, observed disk size is blended in.
+    """
+    dims = int(vector_size or 384)
+    vector_bytes = dims * 4  # float32
+    estimated_per_chunk = int(vector_bytes * 1.8 + 2200)
+    if points >= 50 and disk_bytes > 0:
+        observed = disk_bytes / points
+        per_chunk = int(0.4 * estimated_per_chunk + 0.6 * observed)
+    else:
+        per_chunk = estimated_per_chunk
+    per_chunk = max(2048, per_chunk)
+    used = disk_bytes if disk_bytes > 0 else points * per_chunk
+    comfortable_budget = 2 * 1024 ** 3
+    ceiling_budget = 8 * 1024 ** 3
+    capacity_emails = max(1, comfortable_budget // per_chunk)
+    ceiling_emails = max(capacity_emails, ceiling_budget // per_chunk)
+    kb = per_chunk / 1024
     return {
         "vector_dimensions": dims,
         "bytes_per_chunk_estimate": per_chunk,
         "index_bytes_estimate": used,
-        "comfortable_emails": 100_000,
-        "home_pc_ceiling_emails": 1_000_000,
+        "capacity_emails": int(capacity_emails),
+        "comfortable_emails": int(capacity_emails),
+        "home_pc_ceiling_emails": int(ceiling_emails),
         "notes": [
-            "Each email message is typically 1 chunk (long messages split).",
-            "bge-small vectors are 384 numbers; that is about 1.5 KB plus the email text.",
-            "10,000 emails ≈ 40 MB. 100,000 ≈ a few hundred MB. Fine on this PC.",
-            "Around 1 million emails is when embedded Qdrant should become a Qdrant server.",
-            "Answer quality is limited by the LLM context (top 5 chunks), not by how many emails you store.",
-            "phi3 on a single GPU handles one active chat comfortably; more users should wait for vLLM.",
+            f"Each vector has {dims} dimensions (numbers). bge-small uses 384.",
+            f"About {kb:.1f} KB per email chunk, including the search index.",
+            f"Capacity is an estimate for a 2 GB embedded index: about {capacity_emails:,} emails.",
+            f"Around {ceiling_emails:,} emails is when a dedicated Qdrant server is a better fit.",
+            "Answer quality is limited by how many chunks go into the LLM, not by collection size.",
         ],
     }
 
@@ -196,7 +235,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "default_roles": settings.ingestion.default_roles,
                 "default_department": settings.ingestion.default_department,
             },
-            "capacity": _capacity(int(stats.get("points") or 0), int(stats.get("vector_size") or 384)),
+            "capacity": _capacity(
+                int(stats.get("points") or 0),
+                int(stats.get("vector_size") or 384),
+                _dir_bytes(settings.vector.path),
+            ),
         }
 
     @app.get("/api/config/public")
@@ -229,7 +272,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "chunks": len(payloads),
             "sources": sources,
             "qdrant": stats,
-            "capacity": _capacity(len(payloads), int(stats.get("vector_size") or 384)),
+            "capacity": _capacity(
+                len(payloads),
+                int(stats.get("vector_size") or 384),
+                _dir_bytes(settings.vector.path),
+            ),
         }
 
     @app.get("/api/sources/item")
@@ -381,7 +428,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/chat", response_model=ChatResponseBody)
     async def chat(body: ChatRequest, user=Depends(current_user)):
-        result = await pipeline.answer(body.message, user, history=body.history)
+        result = await pipeline.answer(
+            body.message, user, history=body.history, length=body.length, staff_role=body.staff_role
+        )
         return ChatResponseBody(
             answer=result.content,
             citations=[
@@ -401,7 +450,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/chat/stream")
     async def chat_stream(body: ChatRequest, user=Depends(current_user)):
         async def event_generator():
-            async for item in pipeline.stream_answer(body.message, user, history=body.history):
+            async for item in pipeline.stream_answer(
+                body.message,
+                user,
+                history=body.history,
+                length=body.length,
+                staff_role=body.staff_role,
+            ):
                 if isinstance(item, str):
                     yield {"event": "token", "data": item}
                 elif isinstance(item, dict) and item.get("event") == "citations":
@@ -438,8 +493,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:
-            raise HTTPException(status_code=503, detail=f"TTS failed: {exc}") from exc
+            raise HTTPException(status_code=503, detail=_tts_error(exc)) from exc
         return Response(content=audio, media_type="audio/mpeg")
+
+    @app.get("/ollama.html")
+    async def ollama_page_moved():
+        return RedirectResponse(url="/model.html", status_code=308)
 
     app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
     return app

@@ -59,7 +59,7 @@ Docker is **optional** (Qdrant server + vLLM later). This PC uses embedded Qdran
 |------|------------|
 | **Chat** | Operator console. Type or speak. ATLAS searches Qdrant, then answers (optional TTS). |
 | **Qdrant** | Vector database. Upload `.eml` / `.mbox`, browse, open, delete. |
-| **Ollama** | Models on this PC. Pull Phi / Llama / Gemma, inspect Modelfiles, switch the chat model. |
+| **Model** | Models on this PC. Pull Phi / Llama / Gemma, inspect Modelfiles, switch the chat model. |
 | **About** | Live specs and email capacity. |
 | **Settings** | Dropdown of installed models, RAG limits, voice. Saves to `.env`. |
 
@@ -74,7 +74,7 @@ Docker is **optional** (Qdrant server + vLLM later). This PC uses embedded Qdran
 
 Phi-3 Mini is about **2.2 GB on disk** and runs on CPU. Expect slower replies on i7-only than on a GPU, but it is usable. 7B–8B models on CPU-only will feel heavy.
 
-Ollama can **list, pull, show, and delete** models on this machine (`/api/tags`, `/api/pull`, …). It does **not** offer an official API to browse [ollama.com/library](https://ollama.com/library). The Ollama page ships a shortlist and lets you pull any library name.
+Ollama can **list, pull, show, and delete** models on this machine (`/api/tags`, `/api/pull`, …). It does **not** offer an official API to browse [ollama.com/library](https://ollama.com/library). The **Model** page (`/model.html`) talks about Ollama as the runner, ships a shortlist, and lets you pull any library name. Old `/ollama.html` bookmarks redirect there.
 
 ## Add your own email
 

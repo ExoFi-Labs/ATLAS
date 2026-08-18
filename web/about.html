@@ -31,7 +31,7 @@
           <p class="help" style="margin-top: 14px">
             Chat default is <strong>Microsoft Phi-3 Mini</strong> through Ollama (<code>phi3:latest</code>),
             a 3.8B model for laptops. Ollama is the runner, not the model. Google’s small model is
-            Gemma. Switch or pull models on the <a href="/ollama.html">Ollama</a> page.
+            Gemma. Switch or pull models on the <a href="/model.html">Model</a> page.
             Work later: same client, vLLM URL in <code>.env</code>. Auth is <code>dev</code> until SSO.
           </p>
         </section>
@@ -47,7 +47,7 @@
         <table class="table" id="spec"></table>
       </section>
     </div>
-    <script src="/js/atlas.js?v=ui14"></script>
+    <script src="/js/atlas.js?v=ui16"></script>
     <script>
       document.getElementById("nav").innerHTML = nav("about");
       document.getElementById("hero").innerHTML = terminal("About");
@@ -63,7 +63,7 @@
           <div class="stat"><b>${q.points}</b><span>Stored vectors</span></div>
           <div class="stat"><b>${status.version}</b><span>ATLAS version</span></div>`;
         document.getElementById("cap-intro").textContent =
-          `Current index ≈ ${bytes(cap.index_bytes_estimate)}. Comfortable on this home PC: about ${(cap.comfortable_emails || 0).toLocaleString()} emails. Practical ceiling before switching to a Qdrant server: about ${(cap.home_pc_ceiling_emails || 0).toLocaleString()}.`;
+          `Current index ≈ ${bytes(cap.index_bytes_estimate)}. Capacity on this PC: about ${(cap.capacity_emails || cap.comfortable_emails || 0).toLocaleString()} emails. Practical ceiling before switching to a Qdrant server: about ${(cap.home_pc_ceiling_emails || 0).toLocaleString()}.`;
         document.getElementById("cap-notes").innerHTML = (cap.notes || []).map((n) => `<li>${n}</li>`).join("");
         const rows = [
           ["Environment", status.env],

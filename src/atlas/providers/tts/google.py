@@ -7,6 +7,7 @@ import re
 from google.cloud import texttospeech
 
 from atlas.config import TTSSettings
+from atlas.textprep import for_speech
 
 _LANG = re.compile(r"^([a-z]{2}-[A-Z]{2})")
 
@@ -30,7 +31,9 @@ class GoogleTTS:
         speaking_rate: float | None = None,
         voice: str | None = None,
     ) -> bytes:
-        clipped = (text or "").strip()
+        clipped = for_speech(text or "")
+        if not clipped:
+            raise RuntimeError("Nothing to speak")
         if len(clipped) > 4500:
             clipped = clipped[:4500]
         rate = float(speaking_rate if speaking_rate is not None else self.settings.speaking_rate or 1.0)

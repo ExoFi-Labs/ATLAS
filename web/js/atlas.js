@@ -23,7 +23,7 @@ function nav(active) {
       <nav class="nav" aria-label="Primary">
         ${link("chat", "/", "Chat")}
         ${link("qdrant", "/qdrant.html", "Qdrant")}
-        ${link("ollama", "/ollama.html", "Ollama")}
+        ${link("model", "/model.html", "Model")}
         ${link("about", "/about.html", "About")}
         ${link("settings", "/settings.html", "Settings")}
       </nav>
