@@ -41,7 +41,7 @@ const silenceMs = document.getElementById("silence-ms");
 const speakRate = document.getElementById("speak-rate");
 
 document.getElementById("nav").innerHTML = nav("chat");
-document.getElementById("hero").innerHTML = terminal("internal assistant online · grounded on company email");
+document.getElementById("hero").innerHTML = terminal("Chat", "Internal assistant · grounded on company email");
 
 speakReplies.checked = prefs.speak;
 autoSend.checked = prefs.autoSend;
@@ -111,7 +111,7 @@ function appendMessage(text, role, citations = []) {
   node.className = `msg ${role}`;
   const tag = document.createElement("div");
   tag.className = "msg-tag";
-  tag.textContent = role === "user" ? "operator" : role === "think" ? "atlas · thinking" : "atlas";
+  tag.textContent = role === "user" ? "You" : role === "think" ? "ATLAS · thinking" : "ATLAS";
   const body = document.createElement("div");
   body.className = "msg-body";
   body.appendChild(document.createTextNode(text));
@@ -122,6 +122,7 @@ function appendMessage(text, role, citations = []) {
     replay.className = "ghost-btn replay";
     replay.type = "button";
     replay.textContent = "Speak";
+    replay.setAttribute("aria-label", "Speak this reply");
     replay.addEventListener("click", () => speak(text, { loop: false }));
     node.appendChild(replay);
   }
@@ -221,7 +222,7 @@ function stopSpeaking() {
   }
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   setSpeaking(false);
-  if (!listening) setLamp("idle", "idle");
+  if (!listening) setLamp("idle", "Idle");
 }
 
 function haltAudio() {
@@ -238,7 +239,7 @@ async function speak(text, { loop = false } = {}) {
     .replace(/\[[0-9]+\]/g, "")
     .trim();
   if (!spoken) return;
-  setLamp("speak", "speaking");
+  setLamp("speak", "Speaking");
   setSpeaking(true);
   try {
     if (config.tts?.provider === "google") {
@@ -280,7 +281,7 @@ async function speak(text, { loop = false } = {}) {
   } finally {
     if (gen === speakGen) {
       setSpeaking(false);
-      if (!listening) setLamp("idle", "idle");
+      if (!listening) setLamp("idle", "Idle");
     }
   }
   if (loop && prefs.twoWay && !cancelled && gen === speakGen) await startListening();
@@ -439,7 +440,7 @@ function startBrowserSpeech(Speech) {
   listening = true;
   micBtn.classList.add("live");
   vu.classList.add("live");
-  setLamp("listen", "listening");
+  setLamp("listen", "Listening");
   setStatus("Listening (browser speech). Pause when finished.");
   let finalText = "";
   recognition.onresult = (event) => {
@@ -463,7 +464,7 @@ function startBrowserSpeech(Speech) {
     micBtn.classList.remove("live");
     vu.classList.remove("live");
     recognition = null;
-    setLamp("idle", "idle");
+    setLamp("idle", "Idle");
     if (cancelled) {
       setStatus("");
       return;
@@ -520,7 +521,7 @@ async function startWhisperCapture() {
   workletNode._stream = stream;
   micBtn.classList.add("live");
   vu.classList.add("live");
-  setLamp("listen", "listening");
+  setLamp("listen", "Listening");
   setStatus("Listening (Whisper). Pause to cut.");
   watchSilence(source);
 }
@@ -590,7 +591,7 @@ async function stopListening(transcribeNow) {
     await audioCtx.close().catch(() => {});
     audioCtx = null;
   }
-  setLamp("idle", "idle");
+  setLamp("idle", "Idle");
   const pcm = mergePcm(pcmChunks);
   pcmChunks = [];
   if (!transcribeNow) {
@@ -693,7 +694,7 @@ async function loadStatus() {
     document.getElementById("stat-points").textContent = status.qdrant.points ?? sources.chunks;
     document.getElementById("stat-emails").textContent = sources.count;
     document.getElementById("channel-meta").textContent =
-      `operator uplink · ${status.llm.model} · grounded on company email`;
+      `${status.llm.model} · grounded on company email`;
     if (!Number(localStorage.getItem("atlas.speakRate")) && cfg.tts?.speaking_rate) {
       prefs.rate = Number(cfg.tts.speaking_rate);
       speakRate.value = String(prefs.rate);

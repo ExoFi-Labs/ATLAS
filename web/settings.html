@@ -4,9 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Settings — ATLAS</title>
-    <link rel="stylesheet" href="/css/atlas.css" />
+    <link rel="stylesheet" href="/css/atlas.css?v=ui9" />
   </head>
   <body>
+    <a class="skip-link" href="#form">Skip to settings</a>
     <div class="app">
       <div id="nav"></div>
       <div id="hero"></div>
@@ -19,13 +20,13 @@
       <form class="panel" id="form">
         <h2>Language model</h2>
         <div class="form-grid">
-          <div>
-            <label>Installed Ollama models</label>
+          <label>
+            <span>Installed Ollama models</span>
             <select name="ATLAS_LLM__MODEL" id="model-select"></select>
-          </div>
-          <div><label>Base URL</label><input name="ATLAS_LLM__BASE_URL" /></div>
-          <div><label>Max tokens</label><input name="ATLAS_LLM__MAX_TOKENS" type="number" /></div>
-          <div><label>Temperature</label><input name="ATLAS_LLM__TEMPERATURE" type="number" step="0.05" /></div>
+          </label>
+          <label><span>Base URL</span><input name="ATLAS_LLM__BASE_URL" /></label>
+          <label><span>Max tokens</span><input name="ATLAS_LLM__MAX_TOKENS" type="number" /></label>
+          <label><span>Temperature</span><input name="ATLAS_LLM__TEMPERATURE" type="number" step="0.05" /></label>
         </div>
         <p class="help">
           Default is Microsoft <strong>Phi-3 Mini</strong> (<code>phi3:latest</code>) via Ollama — a small model for laptops.
@@ -34,23 +35,23 @@
 
         <h2 style="margin-top: 22px">Retrieval (RAG)</h2>
         <div class="form-grid">
-          <div><label>Candidates (top K)</label><input name="ATLAS_RAG__TOP_K" type="number" /></div>
-          <div><label>Chunks sent to LLM (top N)</label><input name="ATLAS_RAG__TOP_N" type="number" /></div>
-          <div><label>Minimum similarity</label><input name="ATLAS_RAG__MIN_SCORE" type="number" step="0.01" /></div>
+          <label><span>Candidates (top K)</span><input name="ATLAS_RAG__TOP_K" type="number" /></label>
+          <label><span>Chunks sent to LLM (top N)</span><input name="ATLAS_RAG__TOP_N" type="number" /></label>
+          <label><span>Minimum similarity</span><input name="ATLAS_RAG__MIN_SCORE" type="number" step="0.01" /></label>
         </div>
-        <p class="help">Higher K searches more of Qdrant. Higher N stuffs more email into the prompt. Raise min score to ignore weak matches.</p>
+        <p class="help">Higher K searches more of Qdrant. Higher N sends more email into the prompt. Raise min score to ignore weak matches.</p>
 
         <h2 style="margin-top: 22px">Voice</h2>
         <div class="form-grid">
-          <div>
-            <label>TTS provider</label>
+          <label>
+            <span>TTS provider</span>
             <select name="ATLAS_TTS__PROVIDER">
               <option value="none">none (browser voice in chat)</option>
               <option value="google">google</option>
             </select>
-          </div>
-          <div>
-            <label>Google voice</label>
+          </label>
+          <label>
+            <span>Google voice</span>
             <select name="ATLAS_TTS__GOOGLE_VOICE">
               <option value="en-AU-Chirp3-HD-Kore">AU Chirp 3 HD · Kore (recommended)</option>
               <option value="en-AU-Chirp3-HD-Aoede">AU Chirp 3 HD · Aoede</option>
@@ -62,51 +63,52 @@
               <option value="en-AU-Neural2-C">AU Neural2 · C</option>
               <option value="en-US-Neural2-J">US Neural2 · J</option>
             </select>
-          </div>
-          <div><label>Speaking rate</label><input name="ATLAS_TTS__SPEAKING_RATE" type="number" step="0.05" min="0.5" max="2" /></div>
-          <div>
-            <label>STT provider</label>
+          </label>
+          <label><span>Speaking rate</span><input name="ATLAS_TTS__SPEAKING_RATE" type="number" step="0.05" min="0.5" max="2" /></label>
+          <label>
+            <span>STT provider</span>
             <select name="ATLAS_STT__PROVIDER">
               <option value="none">none</option>
               <option value="whisper">whisper</option>
             </select>
-          </div>
-          <div><label>Whisper model</label><input name="ATLAS_STT__WHISPER_MODEL" /></div>
-          <div>
-            <label>Silero VAD</label>
+          </label>
+          <label><span>Whisper model</span><input name="ATLAS_STT__WHISPER_MODEL" /></label>
+          <label>
+            <span>Silero VAD</span>
             <select name="ATLAS_STT__VAD">
               <option value="true">on</option>
               <option value="false">off</option>
             </select>
-          </div>
-          <div><label>VAD threshold</label><input name="ATLAS_STT__VAD_THRESHOLD" type="number" step="0.05" min="0.1" max="0.9" /></div>
-          <div><label>VAD silence (ms)</label><input name="ATLAS_STT__VAD_MIN_SILENCE_MS" type="number" step="50" min="200" max="2000" /></div>
+          </label>
+          <label><span>VAD threshold</span><input name="ATLAS_STT__VAD_THRESHOLD" type="number" step="0.05" min="0.1" max="0.9" /></label>
+          <label><span>VAD silence (ms)</span><input name="ATLAS_STT__VAD_MIN_SILENCE_MS" type="number" step="50" min="200" max="2000" /></label>
         </div>
         <p class="help">
           Chat uses browser speech or Whisper in, then Google <strong>Chirp 3 HD</strong> (Kore) when TTS is google.
           Neural2 is the older general-purpose tier. Missing GCP credentials fall back to the browser voice.
         </p>
 
-        <h2 style="margin-top: 22px">Ingest &amp; access</h2>
+        <h2 style="margin-top: 22px">Ingest and access</h2>
         <div class="form-grid">
-          <div><label>Default Qdrant roles</label><input name="ATLAS_INGESTION__DEFAULT_ROLES" /></div>
-          <div><label>Default department</label><input name="ATLAS_INGESTION__DEFAULT_DEPARTMENT" /></div>
-          <div><label>Dev user roles</label><input name="ATLAS_AUTH__DEV_ROLES" /></div>
+          <label><span>Default Qdrant roles</span><input name="ATLAS_INGESTION__DEFAULT_ROLES" /></label>
+          <label><span>Default department</span><input name="ATLAS_INGESTION__DEFAULT_DEPARTMENT" /></label>
+          <label><span>Dev user roles</span><input name="ATLAS_AUTH__DEV_ROLES" /></label>
         </div>
         <p class="help">New emails inherit default roles. Dev roles decide what the local user can retrieve until SSO exists.</p>
 
         <div class="composer" style="margin-top: 18px">
-          <p class="flash" id="status"></p>
+          <p class="flash" id="status" role="status"></p>
           <button type="submit">Save settings</button>
         </div>
       </form>
     </div>
-    <script src="/js/atlas.js"></script>
+    <script src="/js/atlas.js?v=ui8"></script>
     <script>
       document.getElementById("nav").innerHTML = nav("settings");
-      document.getElementById("hero").innerHTML = terminal("settings · persist to .env");
+      document.getElementById("hero").innerHTML = terminal("Settings", "Saved to .env on this machine");
       const form = document.getElementById("form");
       const modelSelect = document.getElementById("model-select");
+      const statusEl = document.getElementById("status");
 
       Promise.all([api("/api/settings"), api("/api/ollama/status").catch(() => ({ online: false, models: [] }))])
         .then(([data, ollama]) => {
@@ -133,9 +135,11 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ values }),
           });
-          document.getElementById("status").textContent = `Saved ${result.saved.length} keys. Restart ATLAS if you changed LLM URL, TTS, or STT.`;
+          statusEl.classList.remove("error");
+          statusEl.textContent = `Saved ${result.saved.length} keys. Restart ATLAS if you changed LLM URL, TTS, or STT.`;
         } catch (error) {
-          document.getElementById("status").textContent = error.message;
+          statusEl.classList.add("error");
+          statusEl.textContent = error.message;
         }
       });
     </script>

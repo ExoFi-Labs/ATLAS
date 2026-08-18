@@ -4,14 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ollama — ATLAS</title>
-    <link rel="stylesheet" href="/css/atlas.css" />
+    <link rel="stylesheet" href="/css/atlas.css?v=ui9" />
   </head>
   <body>
+    <a class="skip-link" href="#live">Skip to models</a>
     <div class="app">
       <div id="nav"></div>
       <div id="hero"></div>
       <p class="lede">
-        <strong>Ollama</strong> is the local model runner. The chat model is
+        Ollama is the local model runner. The chat model is
         <strong>Microsoft Phi-3 Mini</strong> (<code>phi3:latest</code>) by default — not Google.
         Google’s small model is Gemma. This page lists models on this PC, pulls free models from
         the Ollama library, and can switch what ATLAS uses.
@@ -42,19 +43,22 @@
           <a href="https://ollama.com/library" target="_blank" rel="noreferrer">ollama.com/library</a>.
         </p>
         <div class="composer" style="margin-bottom: 12px">
-          <input id="search" placeholder="Filter shortlist, or type a library name to pull (e.g. phi4-mini)" />
+          <label class="field">
+            <span>Find a model</span>
+            <input id="search" placeholder="Filter shortlist, or type a library name to pull (e.g. phi4-mini)" />
+          </label>
           <button type="button" id="search-btn">Search</button>
         </div>
-        <p class="flash" id="pull-status"></p>
+        <p class="flash" id="pull-status" role="status"></p>
         <div style="overflow:auto">
           <table class="table" id="catalog-table"></table>
         </div>
       </section>
     </div>
-    <script src="/js/atlas.js"></script>
+    <script src="/js/atlas.js?v=ui8"></script>
     <script>
       document.getElementById("nav").innerHTML = nav("ollama");
-      document.getElementById("hero").innerHTML = terminal("ollama · local models · microsoft phi-3 default");
+      document.getElementById("hero").innerHTML = terminal("Ollama", "Local models · Microsoft Phi-3 default");
 
       function gb(n) {
         if (!n) return "—";

@@ -1,35 +1,41 @@
-const ASCII = `
- █████╗ ████████╗██╗      █████╗ ███████╗
-██╔══██╗╚══██╔══╝██║     ██╔══██╗██╔════╝
-███████║   ██║   ██║     ███████║███████╗
-██╔══██║   ██║   ██║     ██╔══██║╚════██║
-██║  ██║   ██║   ███████╗██║  ██║███████║
-╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝╚══════╝`.trim();
+const ASCII_BANNER = `
+██████ █████   ████   █████               ████  ██████ ██      ████   █████
+██     ██  ██ ██  ██ ██                  ██  ██   ██   ██     ██  ██ ██
+█████  █████  ██  ██  ████      ████     ██████   ██   ██     ██████  ████
+██     ██  ██ ██  ██     ██              ██  ██   ██   ██     ██  ██     ██
+██████ █████   ████  █████               ██  ██   ██   ██████ ██  ██ █████`.trim();
 
 function nav(active) {
+  const link = (id, href, label) =>
+    `<a href="${href}"${active === id ? ' aria-current="page" class="active"' : ""}>${label}</a>`;
   return `
-    <div class="topbar">
-      <div class="brand">ATLAS</div>
-      <nav class="nav">
-        <a href="/" class="${active === "chat" ? "active" : ""}">Chat</a>
-        <a href="/qdrant.html" class="${active === "qdrant" ? "active" : ""}">Qdrant</a>
-        <a href="/ollama.html" class="${active === "ollama" ? "active" : ""}">Ollama</a>
-        <a href="/about.html" class="${active === "about" ? "active" : ""}">About</a>
-        <a href="/settings.html" class="${active === "settings" ? "active" : ""}">Settings</a>
+    <header class="topbar">
+      <a class="brand" href="/">ATLAS</a>
+      <nav class="nav" aria-label="Primary">
+        ${link("chat", "/", "Chat")}
+        ${link("qdrant", "/qdrant.html", "Qdrant")}
+        ${link("ollama", "/ollama.html", "Ollama")}
+        ${link("about", "/about.html", "About")}
+        ${link("settings", "/settings.html", "Settings")}
       </nav>
-    </div>`;
+    </header>`;
 }
 
-function terminal(subtitle) {
+function terminal(title, kicker) {
   return `
-    <section class="terminal">
-      <div class="term-bar">
-        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-        atlas@local — secure shell
-      </div>
-      <div class="term-body">
-        <pre class="ascii">${ASCII}</pre>
-        <p class="term-sub">> ${subtitle}<span class="cursor"></span></p>
+    <section class="masthead">
+      <div class="terminal">
+        <div class="term-bar">
+          <span class="dot r" aria-hidden="true"></span>
+          <span class="dot y" aria-hidden="true"></span>
+          <span class="dot g" aria-hidden="true"></span>
+          <span class="term-title">atlas@local</span>
+        </div>
+        <div class="term-body">
+          <pre class="ascii" aria-hidden="true">${ASCII_BANNER}</pre>
+          <h1 class="term-prompt"><span aria-hidden="true">&gt; </span>${title}<span class="cursor" aria-hidden="true"></span></h1>
+          ${kicker ? `<p class="term-kicker">${kicker}</p>` : ""}
+        </div>
       </div>
     </section>`;
 }

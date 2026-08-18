@@ -4,14 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Qdrant — ATLAS</title>
-    <link rel="stylesheet" href="/css/atlas.css" />
+    <link rel="stylesheet" href="/css/atlas.css?v=ui9" />
   </head>
   <body>
+    <a class="skip-link" href="#stats">Skip to collection</a>
     <div class="app">
       <div id="nav"></div>
       <div id="hero"></div>
       <p class="lede">
-        This is the <strong>Qdrant</strong> console — the vector database ATLAS searches.
+        Qdrant is the vector database ATLAS searches.
         Each indexed email becomes one or more points in a 384-dimension space.
         A question is embedded the same way; the nearest points become the answer’s sources.
         Add, open, browse, or delete records here.
@@ -19,20 +20,11 @@
 
       <div class="cards" id="stats"></div>
 
-      <div class="grid-2" style="margin-top: 16px">
-        <section class="panel">
-          <h2>Vector space</h2>
-          <canvas id="space" width="760" height="220"></canvas>
-          <p class="help" style="margin-top: 8px">
-            Each dot is a stored chunk. Nearby dots are similar in meaning, not in folder location.
-            The ring is a query neighbourhood — RAG pulls the closest points, not the whole archive.
-          </p>
-        </section>
-        <section class="panel">
+      <section class="panel" style="margin-top: 16px">
           <h2>How mail enters Qdrant</h2>
           <div class="pipeline">
             <div class="step"><strong>1</strong>.eml / .mbox</div><span class="arrow">→</span>
-            <div class="step"><strong>2</strong>Parse &amp; thread</div><span class="arrow">→</span>
+            <div class="step"><strong>2</strong>Parse and thread</div><span class="arrow">→</span>
             <div class="step"><strong>3</strong>Strip quotes / PII</div><span class="arrow">→</span>
             <div class="step"><strong>4</strong>Embed 384-d</div><span class="arrow">→</span>
             <div class="step"><strong>5</strong>Upsert point</div>
@@ -42,15 +34,17 @@
             Drop .eml / .mbox to index, or click to add
             <input id="file-input" type="file" accept=".eml,.mbox" multiple />
           </label>
-          <p class="flash" id="upload-status"></p>
-        </section>
-      </div>
+          <p class="flash" id="upload-status" role="status"></p>
+      </section>
 
       <section class="panel" style="margin-top: 16px">
         <h2>Collection browser</h2>
-        <input id="filter" placeholder="Filter by subject, sender, or filename…" />
+        <label class="field">
+          <span>Filter collection</span>
+          <input id="filter" type="search" placeholder="Subject, sender, or filename" />
+        </label>
         <div style="overflow:auto; margin-top: 10px">
-          <table class="table">
+          <table class="table interactive">
             <thead>
               <tr>
                 <th>Subject</th>
@@ -66,7 +60,7 @@
       </section>
     </div>
 
-    <div class="modal-bg" id="modal">
+    <div class="modal-bg" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal">
         <h3 id="modal-title">Email</h3>
         <p class="help" id="modal-meta"></p>
@@ -82,42 +76,13 @@
       </div>
     </div>
 
-    <script src="/js/atlas.js"></script>
+    <script src="/js/atlas.js?v=ui8"></script>
     <script>
       document.getElementById("nav").innerHTML = nav("qdrant");
-      document.getElementById("hero").innerHTML = terminal("qdrant collection · atlas_email_chunks");
+      document.getElementById("hero").innerHTML = terminal("Qdrant", "Collection · atlas_email_chunks");
 
       let sources = [];
       let selectedId = new URLSearchParams(location.search).get("id");
-
-      function drawSpace(items) {
-        const canvas = document.getElementById("space");
-        const ctx = canvas.getContext("2d");
-        const w = canvas.width;
-        const h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = "#0a0c10";
-        ctx.fillRect(0, 0, w, h);
-        ctx.strokeStyle = "rgba(228,179,90,0.15)";
-        ctx.beginPath();
-        ctx.arc(w * 0.62, h * 0.48, 46, 0, Math.PI * 2);
-        ctx.stroke();
-        items.forEach((item, index) => {
-          const seed = [...(item.thread_id || item.message_id || String(index))].reduce((a, c) => a + c.charCodeAt(0), 0);
-          const x = 40 + (seed * 13) % (w - 80);
-          const y = 24 + (seed * 29) % (h - 48);
-          ctx.beginPath();
-          ctx.fillStyle = item.message_id === selectedId ? "#7dffb3" : "#e4b35a";
-          ctx.globalAlpha = 0.85;
-          ctx.arc(x, y, item.message_id === selectedId ? 5 : 3, 0, Math.PI * 2);
-          ctx.fill();
-        });
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = "#8cb4ff";
-        ctx.beginPath();
-        ctx.arc(w * 0.62, h * 0.48, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
 
       function renderRows(filter = "") {
         const q = filter.toLowerCase();
@@ -129,9 +94,17 @@
           )
           .forEach((item) => {
             const tr = document.createElement("tr");
+            tr.tabIndex = 0;
             const file = (item.source_path || "").split(/[/\\]/).pop() || "—";
             tr.innerHTML = `<td>${item.subject}</td><td>${item.from}</td><td>${(item.date || "").slice(0, 10)}</td><td>${item.chunks}</td><td>${file}</td>`;
-            tr.addEventListener("click", () => openItem(item.message_id));
+            const open = () => openItem(item.message_id);
+            tr.addEventListener("click", open);
+            tr.addEventListener("keydown", (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                open();
+              }
+            });
             body.appendChild(tr);
           });
       }
@@ -151,7 +124,6 @@
         document.getElementById("capacity-note").textContent =
           (cap.notes && cap.notes[2]) || "Home PC capacity is tens to hundreds of thousands of emails.";
         renderRows(document.getElementById("filter").value);
-        drawSpace(sources);
         if (selectedId) openItem(selectedId);
       }
 
@@ -168,13 +140,20 @@
           ? "Click “Open original .eml” to load the file from disk."
           : "Original file is not on disk. Showing indexed text only.";
         document.getElementById("raw-btn").disabled = !item.raw_available;
-        drawSpace(sources);
+        document.getElementById("close-btn").focus();
       }
 
-      document.getElementById("close-btn").onclick = () => {
+      function closeModal() {
         document.getElementById("modal").classList.remove("open");
         selectedId = null;
-      };
+      }
+
+      document.getElementById("close-btn").onclick = closeModal;
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && document.getElementById("modal").classList.contains("open")) {
+          closeModal();
+        }
+      });
       document.getElementById("raw-btn").onclick = async () => {
         if (!selectedId) return;
         const response = await fetch(`/api/sources/raw?id=${encodeURIComponent(selectedId)}`);
@@ -183,8 +162,7 @@
       document.getElementById("delete-btn").onclick = async () => {
         if (!selectedId || !confirm("Delete this email’s vectors from Qdrant?")) return;
         await api(`/api/sources/item?id=${encodeURIComponent(selectedId)}`, { method: "DELETE" });
-        document.getElementById("modal").classList.remove("open");
-        selectedId = null;
+        closeModal();
         await refresh();
       };
       document.getElementById("filter").addEventListener("input", (event) => renderRows(event.target.value));

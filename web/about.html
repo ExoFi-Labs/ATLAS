@@ -4,9 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>About — ATLAS</title>
-    <link rel="stylesheet" href="/css/atlas.css" />
+    <link rel="stylesheet" href="/css/atlas.css?v=ui9" />
   </head>
   <body>
+    <a class="skip-link" href="#live">Skip to overview</a>
     <div class="app">
       <div id="nav"></div>
       <div id="hero"></div>
@@ -46,10 +47,10 @@
         <table class="table" id="spec"></table>
       </section>
     </div>
-    <script src="/js/atlas.js"></script>
+    <script src="/js/atlas.js?v=ui8"></script>
     <script>
       document.getElementById("nav").innerHTML = nav("about");
-      document.getElementById("hero").innerHTML = terminal("about · models, retrieval, capacity");
+      document.getElementById("hero").innerHTML = terminal("About", "Models, retrieval, and capacity");
 
       api("/api/status").then((status) => {
         const q = status.qdrant || {};
