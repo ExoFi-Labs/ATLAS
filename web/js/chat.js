@@ -45,7 +45,7 @@ const silenceMs = document.getElementById("silence-ms");
 const speakRate = document.getElementById("speak-rate");
 
 document.getElementById("nav").innerHTML = nav("chat");
-document.getElementById("hero").innerHTML = terminal("Chat", "Internal assistant · grounded on company email");
+document.getElementById("hero").innerHTML = terminal("Chat");
 
 speakReplies.checked = prefs.speak;
 autoSend.checked = prefs.autoSend;

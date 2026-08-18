@@ -1,9 +1,18 @@
-const ASCII_BANNER = `
-██████ █████   ████   █████               ████  ██████ ██      ████   █████
-██     ██  ██ ██  ██ ██                  ██  ██   ██   ██     ██  ██ ██
-█████  █████  ██  ██  ████      ████     ██████   ██   ██     ██████  ████
-██     ██  ██ ██  ██     ██              ██  ██   ██   ██     ██  ██     ██
-██████ █████   ████  █████               ██  ██   ██   ██████ ██  ██ █████`.trim();
+const ASCII_EBOS = `
+███████╗██████╗  ██████╗ ███████╗
+██╔════╝██╔══██╗██╔═══██╗██╔════╝
+█████╗  ██████╔╝██║   ██║███████╗
+██╔══╝  ██╔══██╗██║   ██║╚════██║
+███████╗██████╔╝╚██████╔╝███████║
+╚══════╝╚═════╝  ╚═════╝ ╚══════╝`.trim();
+
+const ASCII_ATLAS = `
+ █████╗ ████████╗██╗      █████╗ ███████╗
+██╔══██╗╚══██╔══╝██║     ██╔══██╗██╔════╝
+███████║   ██║   ██║     ███████║███████╗
+██╔══██║   ██║   ██║     ██╔══██║╚════██║
+██║  ██║   ██║   ███████╗██║  ██║███████║
+╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝╚══════╝`.trim();
 
 function nav(active) {
   const link = (id, href, label) =>
@@ -21,7 +30,7 @@ function nav(active) {
     </header>`;
 }
 
-function terminal(title, kicker) {
+function terminal(title) {
   return `
     <section class="masthead">
       <div class="terminal">
@@ -32,9 +41,11 @@ function terminal(title, kicker) {
           <span class="term-title">atlas@local</span>
         </div>
         <div class="term-body">
-          <pre class="ascii" aria-hidden="true">${ASCII_BANNER}</pre>
+          <div class="ascii-lockup" aria-hidden="true">
+            <pre class="ascii ascii-ebos">${ASCII_EBOS}</pre>
+            <pre class="ascii ascii-atlas">${ASCII_ATLAS}</pre>
+          </div>
           <h1 class="term-prompt"><span aria-hidden="true">&gt; </span>${title}<span class="cursor" aria-hidden="true"></span></h1>
-          ${kicker ? `<p class="term-kicker">${kicker}</p>` : ""}
         </div>
       </div>
     </section>`;
