@@ -18,6 +18,7 @@ build/
 # Data (local dev only)
 data/
 exports/
+examples/wholesale/
 *.mbox
 
 # Node (if web app expands)

@@ -39,7 +39,7 @@
           <label><span>Chunks sent to LLM (top N)</span><input name="ATLAS_RAG__TOP_N" type="number" /></label>
           <label><span>Minimum similarity</span><input name="ATLAS_RAG__MIN_SCORE" type="number" step="0.01" /></label>
         </div>
-        <p class="help">Higher K searches more of Qdrant. Higher N sends more email into the prompt. Raise min score to ignore weak matches.</p>
+        <p class="help">Higher K searches more of Qdrant. Higher N sends more distinct emails into the prompt. Lower min score if answers miss relevant mail; raise it if noise creeps in.</p>
 
         <h2 style="margin-top: 22px">Voice</h2>
         <div class="form-grid">

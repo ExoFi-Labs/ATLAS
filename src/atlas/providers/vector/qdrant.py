@@ -37,6 +37,11 @@ class QdrantVectorStore:
                 except (UnexpectedResponse, ValueError):
                     continue
 
+    async def recreate_collection(self, vector_size: int) -> None:
+        if await self._client.collection_exists(self.settings.collection):
+            await self._client.delete_collection(self.settings.collection)
+        await self.ensure_collection(vector_size)
+
     async def upsert(self, points: list[tuple[str, list[float], dict]]) -> None:
         await self._client.upsert(
             collection_name=self.settings.collection,
@@ -77,7 +82,7 @@ class QdrantVectorStore:
             )
         return chunks
 
-    async def list_payloads(self, *, limit: int = 1000) -> list[dict]:
+    async def list_payloads(self, *, limit: int = 20000) -> list[dict]:
         if not await self._client.collection_exists(self.settings.collection):
             return []
         payloads: list[dict] = []

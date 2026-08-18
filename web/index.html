@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chat — ATLAS</title>
-    <link rel="stylesheet" href="/css/atlas.css?v=ui9" />
+    <link rel="stylesheet" href="/css/atlas.css?v=ui10" />
   </head>
   <body>
     <a class="skip-link" href="#messages">Skip to conversation</a>
@@ -106,7 +106,26 @@
         </aside>
       </div>
     </div>
+    <div class="modal-bg" id="source-modal" role="dialog" aria-modal="true" aria-labelledby="source-title">
+      <div class="modal source-modal">
+        <header class="source-head">
+          <div>
+            <h3 id="source-title">Source email</h3>
+            <p class="help" id="source-meta"></p>
+          </div>
+          <button class="ghost-btn" id="source-close" type="button">Close</button>
+        </header>
+        <div class="composer source-actions">
+          <button class="secondary" id="source-raw" type="button">Open original .eml</button>
+          <a class="ghost-btn" id="source-qdrant" href="/qdrant.html">Open in Qdrant</a>
+        </div>
+        <h2>Indexed text</h2>
+        <div class="raw" id="source-text">Loading…</div>
+        <h2 class="source-raw-label">Original file</h2>
+        <div class="raw" id="source-raw-text">Indexed text is what ATLAS searched. Open the original .eml if you need headers and MIME.</div>
+      </div>
+    </div>
     <script src="/js/atlas.js?v=ui8"></script>
-    <script src="/js/chat.js?v=ui7"></script>
+    <script src="/js/chat.js?v=ui12"></script>
   </body>
 </html>

@@ -37,10 +37,21 @@ class VectorSettings(BaseModel):
     collection: str = "atlas_email_chunks"
 
 
+class OrgSettings(BaseModel):
+    name: str = "Helix Medical Distribution"
+    short_name: str = "Helix"
+    description: str = (
+        "Australasian medical supplies wholesaler serving hospitals, day surgeries, "
+        "aged care, pharmacies, pathology, and veterinary clinics."
+    )
+    email_domain: str = "helixmed.internal"
+
+
 class RAGSettings(BaseModel):
-    top_k: int = 20
-    top_n: int = 5
-    min_score: float = 0.35
+    top_k: int = 48
+    top_n: int = 10
+    min_score: float = 0.22
+    max_chunk_chars: int = 900
 
 
 class TTSSettings(BaseModel):
@@ -90,6 +101,7 @@ class Settings(BaseSettings):
     embeddings: EmbeddingsSettings = Field(default_factory=EmbeddingsSettings)
     vector: VectorSettings = Field(default_factory=VectorSettings)
     rag: RAGSettings = Field(default_factory=RAGSettings)
+    org: OrgSettings = Field(default_factory=OrgSettings)
     tts: TTSSettings = Field(default_factory=TTSSettings)
     stt: STTSettings = Field(default_factory=STTSettings)
     ingestion: IngestionSettings = Field(default_factory=IngestionSettings)

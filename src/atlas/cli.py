@@ -26,6 +26,11 @@ def main() -> None:
         help="Comma-separated allowed_roles for RBAC filters (default: all-staff)",
     )
     ingest.add_argument("--dry-run", action="store_true", help="Parse and chunk without writing to Qdrant")
+    ingest.add_argument(
+        "--replace",
+        action="store_true",
+        help="Delete the existing Qdrant collection before indexing this path",
+    )
 
     args = parser.parse_args()
     if args.command == "ingest":
@@ -56,22 +61,31 @@ async def _ingest(args: argparse.Namespace) -> None:
     registry = get_registry(settings)
     pipeline = EmailIngestionPipeline(registry, settings.ingestion)
     roles = [item.strip() for item in args.roles.split(",")] if args.roles else None
-    result = await pipeline.ingest(
-        path,
-        department=args.department,
-        roles=roles,
-        dry_run=args.dry_run,
-    )
-    mode = "dry-run" if result.dry_run else "indexed"
-    print(f"ATLAS ingest ({mode})")
-    print(f"  files:    {result.files}")
-    print(f"  messages: {result.messages}")
-    print(f"  chunks:   {result.chunks}")
-    print(f"  empty:    {result.skipped_empty}")
-    print(f"  attach:   {result.attachments} indexed, {result.attachments_skipped} skipped")
-    if result.pii_hits:
-        hits = ", ".join(f"{token}={count}" for token, count in sorted(result.pii_hits.items()))
-        print(f"  pii:      {hits}")
+    if args.replace and not args.dry_run:
+        vector_size = int(registry.embeddings.vector_size)
+        await registry.vector.recreate_collection(vector_size)
+        print(f"Replaced Qdrant collection {settings.vector.collection}")
+    subdirs = sorted(p for p in path.iterdir() if p.is_dir()) if path.is_dir() else []
+    targets = [(folder, args.department or folder.name) for folder in subdirs] if subdirs else [(path, args.department)]
+    totals = {"files": 0, "messages": 0, "chunks": 0}
+    for target, department in targets:
+        result = await pipeline.ingest(
+            target,
+            department=department,
+            roles=roles,
+            dry_run=args.dry_run,
+        )
+        mode = "dry-run" if result.dry_run else "indexed"
+        label = target.name if target.is_dir() else str(target)
+        print(f"ATLAS ingest ({mode}) {label} dept={department or settings.ingestion.default_department}")
+        print(f"  files:    {result.files}")
+        print(f"  messages: {result.messages}")
+        print(f"  chunks:   {result.chunks}")
+        totals["files"] += result.files
+        totals["messages"] += result.messages
+        totals["chunks"] += result.chunks
+    if len(targets) > 1:
+        print(f"TOTAL files={totals['files']} messages={totals['messages']} chunks={totals['chunks']}")
 
 
 if __name__ == "__main__":

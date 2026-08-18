@@ -31,6 +31,15 @@ Open **http://localhost:8080**
 
 First ingest downloads the embedding model (`bge-small-en-v1.5`, CPU). After that, ask: *How much PTO do employees accrue?*
 
+For a healthcare-wholesale trial corpus (quotes, orders, invoices, credits, buy-in / direct ship, ETAs, backorders — about 700 fictional Helix emails):
+
+```powershell
+python scripts/generate_mock_emails.py --count 700
+python -m atlas.cli ingest examples/wholesale
+```
+
+Stop `atlas serve` before CLI ingest (embedded Qdrant is one process only). Then restart serve. Try: *How do we raise a return RA?* or *Is buy-in stock returnable?*
+
 ### Linux / macOS
 
 ```bash

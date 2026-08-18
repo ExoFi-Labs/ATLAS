@@ -26,6 +26,10 @@ let holdTalk = false;
 let pressTimer = null;
 let vuRaf = 0;
 
+const TRANSCRIPT_KEY = "atlas.chat.transcript";
+let conversation = [];
+let transcript = [];
+let previewId = "";
 const messagesEl = document.getElementById("messages");
 const emptyEl = document.getElementById("empty");
 const inputEl = document.getElementById("input");
@@ -130,10 +134,19 @@ function appendMessage(text, role, citations = []) {
     const box = document.createElement("div");
     box.className = "sources";
     citations.forEach((item) => {
-      const link = document.createElement("a");
       const id = item.message_id || item.metadata?.message_id;
-      link.href = id ? `/qdrant.html?id=${encodeURIComponent(id)}` : "/qdrant.html";
-      link.textContent = item.subject || "source";
+      const label = item.subject || "source";
+      if (!id) {
+        const span = document.createElement("span");
+        span.textContent = label;
+        box.appendChild(span);
+        return;
+      }
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "source-link";
+      link.textContent = label;
+      link.addEventListener("click", () => openSourcePreview(id));
       box.appendChild(link);
     });
     node.appendChild(box);
@@ -146,6 +159,91 @@ function appendMessage(text, role, citations = []) {
 function autosize() {
   inputEl.style.height = "auto";
   inputEl.style.height = `${Math.min(inputEl.scrollHeight, 160)}px`;
+}
+
+function slimCitations(items) {
+  return (items || []).map((item) => ({
+    subject: item.subject || item.metadata?.subject || "source",
+    message_id: item.message_id || item.metadata?.message_id || "",
+    from: item.from || item.metadata?.from || "",
+  }));
+}
+
+function persistChat() {
+  try {
+    sessionStorage.setItem(TRANSCRIPT_KEY, JSON.stringify(transcript.slice(-40)));
+  } catch (_error) {
+    /* quota */
+  }
+}
+
+function rememberTurn(role, content, citations) {
+  transcript.push({
+    role,
+    content,
+    citations: role === "bot" ? slimCitations(citations) : [],
+  });
+  persistChat();
+}
+
+function restoreChat() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(TRANSCRIPT_KEY) || "[]");
+    if (!Array.isArray(saved) || !saved.length) return;
+    transcript = saved;
+    conversation = [];
+    saved.forEach((item) => {
+      if (item.role !== "user" && item.role !== "bot") return;
+      appendMessage(item.content, item.role, item.citations || []);
+      if (item.role === "user") conversation.push({ role: "user", content: item.content });
+      else if (!String(item.content).startsWith("Error: ")) {
+        conversation.push({ role: "assistant", content: item.content });
+      }
+    });
+  } catch (_error) {
+    transcript = [];
+  }
+}
+
+function closeSourcePreview() {
+  previewId = "";
+  document.getElementById("source-modal").classList.remove("open");
+}
+
+async function openSourcePreview(id) {
+  previewId = id;
+  const modal = document.getElementById("source-modal");
+  const title = document.getElementById("source-title");
+  const meta = document.getElementById("source-meta");
+  const text = document.getElementById("source-text");
+  const raw = document.getElementById("source-raw-text");
+  const rawBtn = document.getElementById("source-raw");
+  const qdrant = document.getElementById("source-qdrant");
+  title.textContent = "Source email";
+  meta.textContent = "Loading…";
+  text.textContent = "Loading indexed text…";
+  raw.textContent = "Indexed text is what ATLAS searched. Open the original .eml if you need headers and MIME.";
+  rawBtn.disabled = true;
+  qdrant.href = `/qdrant.html?id=${encodeURIComponent(id)}`;
+  modal.classList.add("open");
+  document.getElementById("source-close").focus();
+  try {
+    const item = await api(`/api/sources/item?id=${encodeURIComponent(id)}`);
+    if (previewId !== id) return;
+    title.textContent = item.subject || "Source email";
+    meta.textContent = [item.from, (item.date || "").replace("T", " ").slice(0, 19), item.department]
+      .filter(Boolean)
+      .join(" · ");
+    text.textContent = (item.chunks || []).map((chunk) => chunk.text).join("\n\n---\n\n") || "(no indexed text)";
+    rawBtn.disabled = !item.raw_available;
+    raw.textContent = item.raw_available
+      ? "Click “Open original .eml” to load the file from disk."
+      : "Original file is not on disk. Showing indexed text only.";
+  } catch (error) {
+    if (previewId !== id) return;
+    meta.textContent = "";
+    text.textContent = error.message;
+  }
 }
 
 async function sendMessage(text) {
@@ -169,10 +267,14 @@ async function sendMessage(text) {
     const data = await api("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, history: conversation.slice(-6) }),
     });
     think.remove();
+    conversation.push({ role: "user", content: message });
+    conversation.push({ role: "assistant", content: data.answer });
     appendMessage(data.answer, "bot", data.citations || []);
+    rememberTurn("user", message);
+    rememberTurn("bot", data.answer, data.citations || []);
     if (prefs.speak || prefs.twoWay) await speak(data.answer, { loop: prefs.twoWay });
   } catch (error) {
     think.remove();
@@ -629,6 +731,9 @@ function clearChannel() {
   cancelled = true;
   stopSpeaking();
   if (listening) stopListening(false);
+  conversation = [];
+  transcript = [];
+  persistChat();
   messagesEl.querySelectorAll(".msg").forEach((node) => node.remove());
   if (emptyEl) emptyEl.style.display = "";
   setStatus("");
@@ -651,6 +756,20 @@ inputEl.addEventListener("keydown", (event) => {
     event.preventDefault();
     sendMessage();
   }
+});
+
+const sourceModal = document.getElementById("source-modal");
+document.getElementById("source-close").addEventListener("click", closeSourcePreview);
+sourceModal.addEventListener("click", (event) => {
+  if (event.target === sourceModal) closeSourcePreview();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && sourceModal.classList.contains("open")) closeSourcePreview();
+});
+document.getElementById("source-raw").addEventListener("click", async () => {
+  if (!previewId) return;
+  const response = await fetch(`/api/sources/raw?id=${encodeURIComponent(previewId)}`);
+  document.getElementById("source-raw-text").textContent = await response.text();
 });
 
 micBtn.addEventListener("pointerdown", (event) => {
@@ -708,5 +827,6 @@ async function loadStatus() {
   }
 }
 
+restoreChat();
 loadStatus();
 inputEl.focus();

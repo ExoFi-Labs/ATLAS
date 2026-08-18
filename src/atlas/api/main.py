@@ -9,6 +9,8 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
+from typing import Literal
+
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
@@ -27,8 +29,14 @@ ALLOWED_SUFFIXES = {".eml", ".mbox"}
 SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
+class ChatTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=8000)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=12)
 
 
 class ChatResponseBody(BaseModel):
@@ -120,7 +128,7 @@ def _capacity(points: int, vector_size: int) -> dict:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     registry = get_registry(settings)
-    pipeline = RAGPipeline(registry, settings.rag)
+    pipeline = RAGPipeline(registry, settings)
     ingest_pipeline = EmailIngestionPipeline(registry, settings.ingestion)
     ingest_lock = asyncio.Lock()
 
@@ -373,7 +381,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/chat", response_model=ChatResponseBody)
     async def chat(body: ChatRequest, user=Depends(current_user)):
-        result = await pipeline.answer(body.message, user)
+        result = await pipeline.answer(body.message, user, history=body.history)
         return ChatResponseBody(
             answer=result.content,
             citations=[
@@ -393,7 +401,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/chat/stream")
     async def chat_stream(body: ChatRequest, user=Depends(current_user)):
         async def event_generator():
-            async for item in pipeline.stream_answer(body.message, user):
+            async for item in pipeline.stream_answer(body.message, user, history=body.history):
                 if isinstance(item, str):
                     yield {"event": "token", "data": item}
                 elif isinstance(item, dict) and item.get("event") == "citations":

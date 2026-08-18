@@ -249,7 +249,21 @@ code {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .sources { margin-top: 8px; font-size: 0.875rem; color: var(--muted); white-space: normal; }
-.sources a { margin-right: 10px; }
+.sources a,
+.sources .source-link { margin-right: 10px; }
+.sources .source-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+.sources .source-link:hover { text-decoration-thickness: 2px; }
 
 .composer {
   display: grid;
@@ -376,6 +390,26 @@ button.secondary:hover, .ghost-btn:hover { background: var(--bg-muted); }
   padding: 20px;
   color: var(--ink);
 }
+.source-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+.source-head h3 { margin: 0 0 6px; }
+.source-actions {
+  margin: 12px 0;
+  grid-template-columns: auto auto 1fr;
+  justify-content: start;
+}
+.source-actions .ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  padding: 0 16px;
+  min-height: 40px;
+}
+.source-raw-label { margin-top: 16px; }
 .raw {
   white-space: pre-wrap;
   font-family: var(--mono);
